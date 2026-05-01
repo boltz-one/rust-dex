@@ -692,7 +692,7 @@ dependencies = [
  "image",
  "theme",
  "ui",
- "util",
+ "wasm-bindgen",
 ]
 
 [[package]]

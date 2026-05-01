@@ -1,4 +1,8 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(target_family = "wasm", no_main)]
+#![cfg_attr(
+    all(not(debug_assertions), not(target_family = "wasm")),
+    windows_subsystem = "windows"
+)]
 
 use assets::Assets;
 use gpui::{
@@ -9,7 +13,6 @@ use gpui_platform::application;
 use std::sync::Arc;
 use theme::{LoadThemes, ThemeSettingsProvider, UiDensity};
 use ui::prelude::*;
-use util::ResultExt;
 
 const APP_ICON_PNG: &[u8] = include_bytes!("../../../assets/images/app-icon.png");
 const APP_ID: &str = "dev.boltz.app";
@@ -74,14 +77,24 @@ fn load_app_icon() -> Result<Arc<image::RgbaImage>> {
     ))
 }
 
-fn main() {
+fn run_app() {
     application().with_assets(Assets).run(|cx: &mut App| {
         theme::init(LoadThemes::All(Box::new(Assets)), cx);
         theme::set_theme_settings_provider(Box::new(BaseThemeSettingsProvider::default()), cx);
-        Assets.load_fonts(cx).log_err();
-        gpui_platform::set_application_icon_png(APP_ICON_PNG).log_err();
+        if let Err(error) = Assets.load_fonts(cx) {
+            eprintln!("failed to load fonts: {error:#}");
+        }
+        if let Err(error) = gpui_platform::set_application_icon_png(APP_ICON_PNG) {
+            eprintln!("failed to set application icon: {error:#}");
+        }
 
-        let app_icon = load_app_icon().log_err();
+        let app_icon = match load_app_icon() {
+            Ok(app_icon) => Some(app_icon),
+            Err(error) => {
+                eprintln!("failed to load application icon: {error:#}");
+                None
+            }
+        };
 
         let bounds = Bounds::centered(None, size(px(640.0), px(420.0)), cx);
         let window = cx.open_window(
@@ -111,4 +124,16 @@ fn main() {
             }
         }
     });
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn main() {
+    run_app();
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen(start)]
+pub fn start() {
+    gpui_platform::web_init();
+    run_app();
 }
