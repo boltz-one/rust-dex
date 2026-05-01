@@ -1,0 +1,28 @@
+[package]
+description = "A clean GPUI desktop application base."
+edition.workspace = true
+name = "boltz"
+version = "0.1.0"
+publish.workspace = true
+license = "GPL-3.0-or-later"
+default-run = "boltz"
+build = "build.rs"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "boltz"
+path = "src/main.rs"
+
+[dependencies]
+assets.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+image.workspace = true
+theme.workspace = true
+ui.workspace = true
+util.workspace = true
+
+[build-dependencies]
+embed-resource = "3.0"
