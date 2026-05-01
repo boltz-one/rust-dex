@@ -1,8 +1,4 @@
-#![cfg_attr(target_family = "wasm", no_main)]
-#![cfg_attr(
-    all(not(debug_assertions), not(target_family = "wasm")),
-    windows_subsystem = "windows"
-)]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use assets::Assets;
 use gpui::{
@@ -126,14 +122,6 @@ fn run_app() {
     });
 }
 
-#[cfg(not(target_family = "wasm"))]
 fn main() {
-    run_app();
-}
-
-#[cfg(target_family = "wasm")]
-#[wasm_bindgen::prelude::wasm_bindgen(start)]
-pub fn start() {
-    gpui_platform::web_init();
     run_app();
 }

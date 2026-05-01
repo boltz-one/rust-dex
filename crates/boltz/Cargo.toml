@@ -23,8 +23,5 @@ image.workspace = true
 theme.workspace = true
 ui.workspace = true
 
-[target.'cfg(target_family = "wasm")'.dependencies]
-wasm-bindgen.workspace = true
-
 [build-dependencies]
 embed-resource = "3.0"
