@@ -244,7 +244,7 @@ impl LineWrapper {
         // `2^3`, `a~b`, `a=1`, `Self::new`, etc. Trailing punctuation like `,`, `.`, `:`, `;`
         // is included so it stays attached to the preceding word when wrapping.
         matches!(c, '-' | '_' | '.' | '\'' | '’' | '‘' | '$' | '%' | '@' | '#' | '^' | '~' | ',' | '=' | ':' | ';') ||
-        // `⋯` character is special used in Boltz, to keep this at the end of the line.
+        // `⋯` character is special used in the app, to keep this at the end of the line.
         matches!(c, '⋯')
     }
 
@@ -389,7 +389,7 @@ mod tests {
     fn build_wrapper() -> LineWrapper {
         let dispatcher = TestDispatcher::new(0);
         let cx = TestAppContext::build(dispatcher, None);
-        let id = cx.text_system().resolve_font(&font(".BoltzMono"));
+        let id = cx.text_system().resolve_font(&font(".AppMono"));
         LineWrapper::new(id, px(16.), cx.text_system().clone())
     }
 
@@ -848,8 +848,8 @@ mod tests {
 
         // URL case
         assert_word("github.com");
-        assert_not_word("zed-industries/zed");
-        assert_not_word("zed-industries\\zed");
+        assert_not_word("example-org/app");
+        assert_not_word("example-org\\app");
         assert_not_word("a=1&b=2");
         assert_not_word("foo?b=2");
 
@@ -861,7 +861,6 @@ mod tests {
         assert_word("ƀƁƂƃƄƅƆƇƈƉƊƋƌƍƎƏ");
         // Cyrillic
         assert_word("АБВГДЕЖЗИЙКЛМНОП");
-        // Vietnamese (https://github.com/zed-industries/zed/issues/23245)
         assert_word("ThậmchíđếnkhithuachạychúngcònnhẫntâmgiếtnốtsốđôngtùchínhtrịởYênBáivàCaoBằng");
         // Bengali
         assert_word("গিয়েছিলেন");

@@ -1,6 +1,6 @@
 RUSTUP_TOOLCHAIN ?= stable
 RUN_FEATURES := gpui_platform/runtime_shaders
-PACKAGE := boltz
+PACKAGE := app
 
 .PHONY: dev check fmt-check
 

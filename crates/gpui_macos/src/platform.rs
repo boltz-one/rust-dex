@@ -335,8 +335,7 @@ impl MacPlatform {
                     disabled,
                 } => {
                     // Note that this is intentionally using earlier bindings, whereas typically
-                    // later ones take display precedence. See the discussion on
-                    // https://github.com/zed-industries/zed/issues/23621
+                    // later ones take display precedence.
                     let keystrokes = keymap
                         .bindings_for_action(action.as_ref())
                         .find_or_first(|binding| {
@@ -833,7 +832,6 @@ impl Platform for MacPlatform {
                                         .split(|&b| b == b'.')
                                         .collect::<Vec<_>>();
 
-                                    // https://github.com/zed-industries/zed/issues/16969
                                     // Workaround a bug in macOS Sequoia that adds an extra file-extension
                                     // sometimes. e.g. `a.sql` becomes `a.sql.s` or `a.txtx` becomes `a.txtx.txt`
                                     //

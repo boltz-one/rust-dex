@@ -1,0 +1,21 @@
+[package]
+description = "A clean GPUI desktop application base."
+edition.workspace = true
+name = "app"
+version = "0.1.0"
+publish.workspace = true
+license = "GPL-3.0-or-later"
+default-run = "app"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "app"
+path = "src/main.rs"
+
+[dependencies]
+gpui.workspace = true
+gpui_platform.workspace = true
+theme.workspace = true
+ui.workspace = true

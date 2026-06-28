@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Boltz
-Comment=Boltz desktop application
-Exec=boltz %U
-Icon=dev.boltz.app
-Terminal=false
-Categories=Development;Utility;
-StartupWMClass=dev.boltz.app

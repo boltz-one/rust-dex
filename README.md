@@ -1,11 +1,14 @@
-# Boltz
+# Desktop App Template
 
-This repository is a cleaned Boltz Rust desktop application base. The main binary is a small GPUI app in `crates/boltz` with:
+A minimal, cross-platform Rust desktop application template built on [GPUI](https://gpui.rs). The main binary is a small GPUI app in `crates/app` that opens a single centered `hello world` window.
 
-- GPUI windowing and direct element styling
-- reusable `ui` components, `icons`, assets, and the Boltz theme registry
-- database primitives through `db`, `sqlez`, and related support crates
-- a single centered `hello world` startup view
+Highlights:
+
+- GPUI windowing with direct element styling and flexbox layout
+- Reusable `ui` components, `icons`, and a theme system with built-in fallback themes
+- Cross-platform native backends: macOS (Metal), Linux (wgpu/Wayland/X11), Windows (DirectX)
+- No bundled assets — system fonts and built-in themes keep the template lean
+- No persistence layer — re-add when the app needs state
 
 Run the app on this macOS checkout with:
 
@@ -13,13 +16,15 @@ Run the app on this macOS checkout with:
 make dev
 ```
 
-Use `runtime_shaders` when the machine does not have the full Xcode Metal toolchain available. For development checks:
+`make dev` uses the `gpui_platform/runtime_shaders` feature, which avoids requiring the full Xcode Metal toolchain. For development checks:
 
 ```sh
 make check
 make fmt-check
 ```
 
-The upstream product entrypoint, cloud/collab services, agent UI, release tooling, extensions, and deployment infrastructure have been removed. The retained workspace keeps the desktop base primitives needed for future app work.
+Development notes live in `docs/`.
 
-Development notes live in `docs/desktop-base/`.
+## Reference
+
+The `app/` directory contains the upstream App editor source kept only as a reference; it is gitignored and not part of the workspace.

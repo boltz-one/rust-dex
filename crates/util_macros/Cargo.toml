@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 publish = false
 license = "Apache-2.0"
-description = "Utility macros for Boltz"
+description = "Utility macros"
 
 [lints]
 workspace = true
@@ -17,7 +17,3 @@ doctest = false
 [dependencies]
 quote.workspace = true
 syn.workspace = true
-perf.workspace = true
-
-[features]
-perf-enabled = []

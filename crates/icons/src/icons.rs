@@ -25,7 +25,6 @@ pub enum IconName {
     AiOpenRouter,
     AiVercel,
     AiXAi,
-    AiZed,
     Archive,
     ArrowCircle,
     ArrowDown,
@@ -274,16 +273,6 @@ pub enum IconName {
     WholeWord,
     XCircle,
     XCircleFilled,
-    ZedAgent,
-    ZedAgentTwo,
-    ZedAssistant,
-    ZedPredict,
-    ZedPredictDisabled,
-    ZedPredictDown,
-    ZedPredictError,
-    ZedPredictUp,
-    ZedSrcCustom,
-    ZedSrcExtension,
 }
 
 impl IconName {

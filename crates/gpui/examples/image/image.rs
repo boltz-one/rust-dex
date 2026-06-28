@@ -89,9 +89,6 @@ impl Render for ImageShowcase {
                     .justify_center()
                     .items_center()
                     .gap_8()
-                    .child(img(
-                        "https://github.com/zed-industries/zed/actions/workflows/ci.yml/badge.svg",
-                    ))
                     .child(
                         div()
                             .flex()

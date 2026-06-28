@@ -1165,7 +1165,7 @@ impl fmt::Debug for BacktraceFormatter {
                         strip = false;
                         continue;
                     }
-                    "boltz::main" => {
+                    "app::main" => {
                         strip = true;
                         f.frame().backtrace_frame(frame)?;
                     }

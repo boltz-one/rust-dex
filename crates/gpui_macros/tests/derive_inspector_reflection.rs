@@ -1,5 +1,3 @@
-//! This code was generated using Zed Agent with Claude Opus 4.
-
 // gate on rust-analyzer so rust-analyzer never needs to expand this macro, it takes up to 10 seconds to expand due to inefficiencies in rust-analyzers proc-macro srv
 #[cfg_attr(not(rust_analyzer), gpui_macros::derive_inspector_reflection)]
 trait Transform: Clone {
@@ -109,7 +107,7 @@ fn test_derive_inspector_reflection() {
 
     assert_eq!(result, Some(Number(63))); // (10 * 2 + 1) * 3 = 63
 
-    // Test documentationumentation capture
+    // Test documentation capture
     let double_method = find_method::<Number>("double").unwrap();
     assert_eq!(double_method.documentation, Some("Doubles the value"));
 

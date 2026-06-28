@@ -12,7 +12,6 @@ pub use http::{self, Method, Request, Response, StatusCode, Uri, request::Builde
 
 use futures::future::BoxFuture;
 use parking_lot::Mutex;
-use serde::Serialize;
 use std::sync::Arc;
 #[cfg(feature = "test-support")]
 use std::{any::type_name, fmt};
@@ -208,68 +207,6 @@ impl HttpClientWithUrl {
     /// Builds a URL using the given path.
     pub fn build_url(&self, path: &str) -> String {
         format!("{}{}", self.base_url(), path)
-    }
-
-    /// Builds a Boltz API URL using the given path.
-    pub fn build_boltz_api_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
-        let base_url = self.base_url();
-        let base_api_url = match base_url.as_ref() {
-            "https://boltz.dev" => "https://api.boltz.dev",
-            "https://staging.boltz.dev" => "https://api-staging.boltz.dev",
-            "http://localhost:3000" => "http://localhost:8080",
-            other => other,
-        };
-
-        Ok(Url::parse_with_params(
-            &format!("{}{}", base_api_url, path),
-            query,
-        )?)
-    }
-
-    /// Builds a Boltz Cloud URL using the given path.
-    pub fn build_boltz_cloud_url(&self, path: &str) -> Result<Url> {
-        let base_url = self.base_url();
-        let base_api_url = match base_url.as_ref() {
-            "https://boltz.dev" => "https://cloud.boltz.dev",
-            "https://staging.boltz.dev" => "https://cloud.boltz.dev",
-            "http://localhost:3000" => "http://localhost:8787",
-            other => other,
-        };
-
-        Ok(Url::parse(&format!("{}{}", base_api_url, path))?)
-    }
-
-    /// Builds a Boltz Cloud URL using the given path and query params.
-    pub fn build_boltz_cloud_url_with_query(
-        &self,
-        path: &str,
-        query: impl Serialize,
-    ) -> Result<Url> {
-        let base_url = self.base_url();
-        let base_api_url = match base_url.as_ref() {
-            "https://boltz.dev" => "https://cloud.boltz.dev",
-            "https://staging.boltz.dev" => "https://cloud.boltz.dev",
-            "http://localhost:3000" => "http://localhost:8787",
-            other => other,
-        };
-        let query = serde_urlencoded::to_string(&query)?;
-        Ok(Url::parse(&format!("{}{}?{}", base_api_url, path, query))?)
-    }
-
-    /// Builds a Boltz LLM URL using the given path.
-    pub fn build_boltz_llm_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
-        let base_url = self.base_url();
-        let base_api_url = match base_url.as_ref() {
-            "https://boltz.dev" => "https://cloud.boltz.dev",
-            "https://staging.boltz.dev" => "https://llm-staging.boltz.dev",
-            "http://localhost:3000" => "http://localhost:8787",
-            other => other,
-        };
-
-        Ok(Url::parse_with_params(
-            &format!("{}{}", base_api_url, path),
-            query,
-        )?)
     }
 }
 

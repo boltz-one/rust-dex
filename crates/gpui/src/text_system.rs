@@ -70,8 +70,8 @@ impl TextSystem {
             font_runs_pool: Mutex::default(),
             fallback_font_stack: smallvec![
                 // TODO: Remove this when Linux have implemented setting fallbacks.
-                font(".BoltzMono"),
-                font(".BoltzSans"),
+                font(".AppMono"),
+                font(".AppSans"),
                 font("Helvetica"),
                 font("Segoe UI"),     // Windows
                 font("Ubuntu"),       // Gnome (Ubuntu)
@@ -1161,13 +1161,13 @@ impl FontMetrics {
 /// Maps well-known virtual font names to their concrete equivalents.
 #[allow(unused)]
 pub fn font_name_with_fallbacks<'a>(name: &'a str, system: &'a str) -> &'a str {
-    // Boltz keeps app-level aliases for the bundled sans and mono fonts.
+    // The app keeps app-level aliases for the bundled sans and mono fonts.
     // in a derived font name. They are essentially indistinguishable from IBM Plex/Lilex,
     // and so retained here for backward compatibility.
     match name {
         ".SystemUIFont" => system,
-        ".BoltzSans" => "IBM Plex Sans",
-        ".BoltzMono" => "Lilex",
+        ".AppSans" => "IBM Plex Sans",
+        ".AppMono" => "Lilex",
         _ => name,
     }
 }
@@ -1178,13 +1178,13 @@ pub fn font_name_with_fallbacks_shared<'a>(
     name: &'a SharedString,
     system: &'a SharedString,
 ) -> &'a SharedString {
-    // Boltz keeps app-level aliases for the bundled sans and mono fonts.
+    // The app keeps app-level aliases for the bundled sans and mono fonts.
     // in a derived font name. They are essentially indistinguishable from IBM Plex/Lilex,
     // and so retained here for backward compatibility.
     match name.as_str() {
         ".SystemUIFont" => system,
-        ".BoltzSans" => const { &SharedString::new_static("IBM Plex Sans") },
-        ".BoltzMono" => const { &SharedString::new_static("Lilex") },
+        ".AppSans" => const { &SharedString::new_static("IBM Plex Sans") },
+        ".AppMono" => const { &SharedString::new_static("Lilex") },
         _ => name,
     }
 }
