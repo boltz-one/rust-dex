@@ -26,6 +26,9 @@ ignored = ["tracing"]
 
 [dev-dependencies]
 logging.workspace = true
+proptest.workspace = true
+rand.workspace = true
+ctor.workspace = true
 
 [features]
 test-support = ["proptest"]
