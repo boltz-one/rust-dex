@@ -19,10 +19,8 @@ pub mod metal_renderer;
 
 use metal_renderer as renderer;
 
-#[cfg(feature = "font-kit")]
 mod open_type;
 
-#[cfg(feature = "font-kit")]
 mod text_system;
 
 mod platform;
@@ -47,7 +45,6 @@ pub(crate) use keyboard::*;
 pub(crate) use platform::*;
 pub(crate) use window::*;
 
-#[cfg(feature = "font-kit")]
 pub(crate) use text_system::*;
 
 pub use platform::{MacPlatform, set_application_icon_png};
