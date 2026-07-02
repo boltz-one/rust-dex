@@ -1,11 +1,12 @@
 [package]
-name = "util_macros"
+name = "boltz-util-macros"
 version = "0.1.0"
 edition.workspace = true
-publish = false
+publish = true
 license = "Apache-2.0"
 description = "Utility macros"
 
+repository.workspace = true
 [lints]
 workspace = true
 

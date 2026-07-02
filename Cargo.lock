@@ -81,7 +81,7 @@ checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 name = "app"
 version = "0.1.0"
 dependencies = [
- "gpui",
+ "boltz-gpui",
  "gpui_platform",
  "theme",
  "ui",
@@ -621,6 +621,280 @@ dependencies = [
 ]
 
 [[package]]
+name = "boltz-collections"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "rustc-hash 2.1.2",
+]
+
+[[package]]
+name = "boltz-derive-refineable"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "boltz-gpui"
+version = "0.2.2"
+dependencies = [
+ "anyhow",
+ "async-channel 2.5.0",
+ "async-task",
+ "backtrace",
+ "bindgen",
+ "bitflags 2.13.0",
+ "block",
+ "boltz-collections",
+ "boltz-gpui-macros",
+ "boltz-gpui-shared-string",
+ "boltz-gpui-util",
+ "boltz-http-client",
+ "boltz-media",
+ "boltz-refineable",
+ "boltz-scheduler",
+ "boltz-sum-tree",
+ "boltz-util-macros",
+ "cbindgen",
+ "chrono",
+ "cocoa",
+ "cocoa-foundation",
+ "core-foundation",
+ "core-foundation-sys",
+ "core-graphics",
+ "core-text",
+ "core-video",
+ "ctor",
+ "derive_more",
+ "embed-resource",
+ "etagere",
+ "foreign-types",
+ "futures",
+ "futures-concurrency",
+ "getrandom 0.3.4",
+ "image",
+ "inventory",
+ "itertools 0.14.0",
+ "log",
+ "lyon",
+ "mach2",
+ "metal",
+ "num_cpus",
+ "objc",
+ "objc2",
+ "objc2-metal",
+ "parking",
+ "parking_lot",
+ "pathfinder_geometry",
+ "pin-project",
+ "pollster",
+ "profiling",
+ "proptest",
+ "rand",
+ "raw-window-handle",
+ "regex",
+ "resvg",
+ "schemars",
+ "seahash",
+ "serde",
+ "serde_json",
+ "slotmap",
+ "smallvec",
+ "spin 0.10.0",
+ "stacksafe",
+ "strum",
+ "taffy",
+ "thiserror 2.0.18",
+ "ttf-parser",
+ "url",
+ "usvg",
+ "uuid",
+ "waker-fn",
+ "web-time",
+ "windows 0.61.3",
+]
+
+[[package]]
+name = "boltz-gpui-macros"
+version = "0.1.0"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "boltz-gpui-shared-string"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "smol_str",
+]
+
+[[package]]
+name = "boltz-gpui-util"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "log",
+]
+
+[[package]]
+name = "boltz-http-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-compression",
+ "async-fs",
+ "async-tar",
+ "boltz-util",
+ "bytes",
+ "derive_more",
+ "futures",
+ "http",
+ "http-body",
+ "log",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "url",
+]
+
+[[package]]
+name = "boltz-logging"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "boltz-collections",
+ "chrono",
+ "log",
+ "tempfile",
+]
+
+[[package]]
+name = "boltz-media"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bindgen",
+ "core-foundation",
+ "core-video",
+ "ctor",
+ "foreign-types",
+ "metal",
+ "objc",
+]
+
+[[package]]
+name = "boltz-refineable"
+version = "0.1.0"
+dependencies = [
+ "boltz-derive-refineable",
+]
+
+[[package]]
+name = "boltz-scheduler"
+version = "0.1.0"
+dependencies = [
+ "async-task",
+ "backtrace",
+ "chrono",
+ "flume",
+ "futures",
+ "parking_lot",
+ "rand",
+ "web-time",
+]
+
+[[package]]
+name = "boltz-sum-tree"
+version = "0.1.0"
+dependencies = [
+ "boltz-logging",
+ "boltz-tracing-facade",
+ "ctor",
+ "heapless",
+ "log",
+ "proptest",
+ "rand",
+ "rayon",
+ "tracing",
+]
+
+[[package]]
+name = "boltz-tracing-facade"
+version = "0.1.0"
+dependencies = [
+ "boltz-logging",
+ "boltz-tracing-facade-macros",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-tracy",
+ "tracy-client",
+]
+
+[[package]]
+name = "boltz-tracing-facade-macros"
+version = "0.1.0"
+
+[[package]]
+name = "boltz-util"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-fs",
+ "async_zip",
+ "boltz-collections",
+ "boltz-gpui-util",
+ "boltz-util-macros",
+ "command-fds",
+ "dirs",
+ "dunce",
+ "futures",
+ "futures-lite 1.13.0",
+ "git2",
+ "globset",
+ "itertools 0.14.0",
+ "libc",
+ "log",
+ "mach2",
+ "nix 0.29.0",
+ "percent-encoding",
+ "pretty_assertions",
+ "rand",
+ "regex",
+ "rust-embed",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_json_lenient",
+ "shlex 1.3.0",
+ "smol",
+ "take-until",
+ "tempfile",
+ "tendril",
+ "unicase",
+ "url",
+ "walkdir",
+ "which",
+]
+
+[[package]]
+name = "boltz-util-macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "borsh"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -877,14 +1151,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "collections"
-version = "0.1.0"
-dependencies = [
- "indexmap",
- "rustc-hash 2.1.2",
-]
-
-[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -904,9 +1170,9 @@ dependencies = [
 name = "component"
 version = "0.1.0"
 dependencies = [
- "collections",
+ "boltz-collections",
+ "boltz-gpui",
  "documented",
- "gpui",
  "inventory",
  "parking_lot",
  "strum",
@@ -1188,15 +1454,6 @@ dependencies = [
  "rustc_version",
  "syn",
  "unicode-xid",
-]
-
-[[package]]
-name = "derive_refineable"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -2093,86 +2350,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpui"
-version = "0.2.2"
-dependencies = [
- "anyhow",
- "async-channel 2.5.0",
- "async-task",
- "backtrace",
- "bindgen",
- "bitflags 2.13.0",
- "block",
- "cbindgen",
- "chrono",
- "cocoa",
- "cocoa-foundation",
- "collections",
- "core-foundation",
- "core-foundation-sys",
- "core-graphics",
- "core-text",
- "core-video",
- "ctor",
- "derive_more",
- "embed-resource",
- "etagere",
- "foreign-types",
- "futures",
- "futures-concurrency",
- "getrandom 0.3.4",
- "gpui_macros",
- "gpui_shared_string",
- "gpui_util",
- "http_client",
- "image",
- "inventory",
- "itertools 0.14.0",
- "log",
- "lyon",
- "mach2",
- "media",
- "metal",
- "num_cpus",
- "objc",
- "objc2",
- "objc2-metal",
- "parking",
- "parking_lot",
- "pathfinder_geometry",
- "pin-project",
- "pollster",
- "profiling",
- "proptest",
- "rand",
- "raw-window-handle",
- "refineable",
- "regex",
- "resvg",
- "scheduler",
- "schemars",
- "seahash",
- "serde",
- "serde_json",
- "slotmap",
- "smallvec",
- "spin 0.10.0",
- "stacksafe",
- "strum",
- "sum_tree",
- "taffy",
- "thiserror 2.0.18",
- "ttf-parser",
- "url",
- "usvg",
- "util_macros",
- "uuid",
- "waker-fn",
- "web-time",
- "windows 0.61.3",
-]
-
-[[package]]
 name = "gpui_linux"
 version = "0.1.0"
 dependencies = [
@@ -2180,15 +2357,16 @@ dependencies = [
  "as-raw-xcb-connection",
  "ashpd",
  "bitflags 2.13.0",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-http-client",
+ "boltz-util",
  "bytemuck",
  "calloop",
  "calloop-wayland-source",
- "collections",
  "filedescriptor",
  "futures",
- "gpui",
  "gpui_wgpu",
- "http_client",
  "image",
  "itertools 0.14.0",
  "libc",
@@ -2205,7 +2383,6 @@ dependencies = [
  "strum",
  "swash",
  "url",
- "util",
  "uuid",
  "wayland-backend",
  "wayland-client",
@@ -2225,9 +2402,12 @@ dependencies = [
  "anyhow",
  "async-task",
  "block",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-media",
+ "boltz-util",
  "cbindgen",
  "cocoa",
- "collections",
  "core-foundation",
  "core-foundation-sys",
  "core-graphics",
@@ -2240,13 +2420,11 @@ dependencies = [
  "font_kit",
  "foreign-types",
  "futures",
- "gpui",
  "image",
  "itertools 0.14.0",
  "libc",
  "log",
  "mach2",
- "media",
  "metal",
  "objc",
  "objc2-app-kit",
@@ -2256,45 +2434,17 @@ dependencies = [
  "semver",
  "smallvec",
  "strum",
- "util",
  "uuid",
-]
-
-[[package]]
-name = "gpui_macros"
-version = "0.1.0"
-dependencies = [
- "heck 0.5.0",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
 name = "gpui_platform"
 version = "0.1.0"
 dependencies = [
- "gpui",
+ "boltz-gpui",
  "gpui_linux",
  "gpui_macos",
  "gpui_windows",
-]
-
-[[package]]
-name = "gpui_shared_string"
-version = "0.1.0"
-dependencies = [
- "schemars",
- "serde",
- "smol_str",
-]
-
-[[package]]
-name = "gpui_util"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "log",
 ]
 
 [[package]]
@@ -2302,12 +2452,12 @@ name = "gpui_wgpu"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-gpui-util",
  "bytemuck",
- "collections",
  "cosmic-text",
  "etagere",
- "gpui",
- "gpui_util",
  "itertools 0.14.0",
  "js-sys",
  "log",
@@ -2328,10 +2478,11 @@ name = "gpui_windows"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "collections",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-util",
  "etagere",
  "futures",
- "gpui",
  "image",
  "itertools 0.14.0",
  "log",
@@ -2339,7 +2490,6 @@ dependencies = [
  "rand",
  "raw-window-handle",
  "smallvec",
- "util",
  "uuid",
  "windows 0.61.3",
  "windows-core 0.61.2",
@@ -2501,29 +2651,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "http_client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-compression",
- "async-fs",
- "async-tar",
- "bytes",
- "derive_more",
- "futures",
- "http",
- "http-body",
- "log",
- "parking_lot",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "url",
- "util",
-]
-
-[[package]]
 name = "iana-time-zone"
 version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2551,7 +2678,7 @@ dependencies = [
 name = "icons"
 version = "0.1.0"
 dependencies = [
- "gpui",
+ "boltz-gpui",
  "rust-embed",
  "serde",
  "strum",
@@ -3046,17 +3173,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "logging"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "collections",
- "log",
- "tempfile",
-]
-
-[[package]]
 name = "loom"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3184,20 +3300,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "media"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bindgen",
- "core-foundation",
- "core-video",
- "ctor",
- "foreign-types",
- "metal",
- "objc",
-]
-
-[[package]]
 name = "memchr"
 version = "2.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3225,7 +3327,7 @@ dependencies = [
 name = "menu"
 version = "0.1.0"
 dependencies = [
- "gpui",
+ "boltz-gpui",
 ]
 
 [[package]]
@@ -4352,13 +4454,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "refineable"
-version = "0.1.0"
-dependencies = [
- "derive_refineable",
-]
-
-[[package]]
 name = "regex"
 version = "1.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4562,20 +4657,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "scheduler"
-version = "0.1.0"
-dependencies = [
- "async-task",
- "backtrace",
- "chrono",
- "flume",
- "futures",
- "parking_lot",
- "rand",
- "web-time",
 ]
 
 [[package]]
@@ -5010,21 +5091,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
-name = "sum_tree"
-version = "0.1.0"
-dependencies = [
- "ctor",
- "heapless",
- "log",
- "logging",
- "proptest",
- "rand",
- "rayon",
- "tracing",
- "tracing_facade",
-]
-
-[[package]]
 name = "sval"
 version = "2.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5155,7 +5221,7 @@ dependencies = [
 name = "syntax_theme"
 version = "0.1.0"
 dependencies = [
- "gpui",
+ "boltz-gpui",
 ]
 
 [[package]]
@@ -5223,11 +5289,11 @@ name = "theme"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "collections",
- "gpui",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-refineable",
  "palette",
  "parking_lot",
- "refineable",
  "schemars",
  "serde",
  "serde_json",
@@ -5518,22 +5584,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing_facade"
-version = "0.1.0"
-dependencies = [
- "logging",
- "tracing",
- "tracing-subscriber",
- "tracing-tracy",
- "tracing_facade_macros",
- "tracy-client",
-]
-
-[[package]]
-name = "tracing_facade_macros"
-version = "0.1.0"
-
-[[package]]
 name = "tracy-client"
 version = "0.18.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5590,12 +5640,12 @@ dependencies = [
 name = "ui"
 version = "0.1.0"
 dependencies = [
+ "boltz-gpui",
+ "boltz-gpui-macros",
+ "boltz-gpui-util",
  "chrono",
  "component",
  "documented",
- "gpui",
- "gpui_macros",
- "gpui_util",
  "icons",
  "itertools 0.14.0",
  "menu",
@@ -5612,8 +5662,8 @@ dependencies = [
 name = "ui_gallery"
 version = "0.1.0"
 dependencies = [
+ "boltz-gpui",
  "component",
- "gpui",
  "gpui_platform",
  "icons",
  "theme",
@@ -5758,56 +5808,6 @@ name = "utf8_iter"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
-
-[[package]]
-name = "util"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-fs",
- "async_zip",
- "collections",
- "command-fds",
- "dirs",
- "dunce",
- "futures",
- "futures-lite 1.13.0",
- "git2",
- "globset",
- "gpui_util",
- "itertools 0.14.0",
- "libc",
- "log",
- "mach2",
- "nix 0.29.0",
- "percent-encoding",
- "pretty_assertions",
- "rand",
- "regex",
- "rust-embed",
- "schemars",
- "serde",
- "serde_json",
- "serde_json_lenient",
- "shlex 1.3.0",
- "smol",
- "take-until",
- "tempfile",
- "tendril",
- "unicase",
- "url",
- "util_macros",
- "walkdir",
- "which",
-]
-
-[[package]]
-name = "util_macros"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn",
-]
 
 [[package]]
 name = "uuid"

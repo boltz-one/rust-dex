@@ -1,10 +1,12 @@
 [package]
-name = "scheduler"
+name = "boltz-scheduler"
 version = "0.1.0"
 edition.workspace = true
-publish.workspace = true
+publish = true
 license = "Apache-2.0"
 
+description = "Task scheduler used by GPUI"
+repository.workspace = true
 [lints]
 workspace = true
 

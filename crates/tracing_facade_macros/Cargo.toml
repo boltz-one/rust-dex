@@ -1,10 +1,12 @@
 [package]
-name = "tracing_facade_macros"
+name = "boltz-tracing-facade-macros"
 version = "0.1.0"
 edition.workspace = true
-publish.workspace = true
+publish = true
 license = "GPL-3.0-or-later"
 
+description = "Macros for the tracing facade used by GPUI"
+repository.workspace = true
 [lib]
 proc-macro = true
 

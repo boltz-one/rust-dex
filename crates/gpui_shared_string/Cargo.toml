@@ -1,9 +1,12 @@
 [package]
-name = "gpui_shared_string"
+name = "boltz-gpui-shared-string"
 version = "0.1.0"
-publish.workspace = true
+publish = true
 edition.workspace = true
 
+license = "Apache-2.0"
+description = "Shared string type used by GPUI"
+repository.workspace = true
 [lib]
 path = "gpui_shared_string.rs"
 

@@ -38,37 +38,38 @@ default-members = ["crates/app"]
 [workspace.package]
 publish = false
 edition = "2024"
+repository = "https://github.com/boltz-one/rust-dex"
 
 [workspace.dependencies]
-collections = { path = "crates/collections", version = "0.1.0" }
+collections = { path = "crates/collections", version = "0.1.0", package = "boltz-collections" }
 component = { path = "crates/component" }
-derive_refineable = { path = "crates/refineable/derive_refineable" }
+derive_refineable = { path = "crates/refineable/derive_refineable", version = "0.1.0", package = "boltz-derive-refineable" }
 font_kit = { path = "crates/font_kit" }
-gpui = { path = "crates/gpui", default-features = false }
-gpui_shared_string = { path = "crates/gpui_shared_string" }
+gpui = { path = "crates/gpui", default-features = false, version = "0.2.2", package = "boltz-gpui" }
+gpui_shared_string = { path = "crates/gpui_shared_string", version = "0.1.0", package = "boltz-gpui-shared-string" }
 gpui_linux = { path = "crates/gpui_linux", default-features = false }
 gpui_macos = { path = "crates/gpui_macos", default-features = false }
-gpui_macros = { path = "crates/gpui_macros" }
+gpui_macros = { path = "crates/gpui_macros", version = "0.1.0", package = "boltz-gpui-macros" }
 gpui_platform = { path = "crates/gpui_platform", default-features = false }
 gpui_wgpu = { path = "crates/gpui_wgpu" }
 gpui_windows = { path = "crates/gpui_windows", default-features = false }
-gpui_util = { path = "crates/gpui_util" }
-http_client = { path = "crates/http_client" }
+gpui_util = { path = "crates/gpui_util", version = "0.1.0", package = "boltz-gpui-util" }
+http_client = { path = "crates/http_client", version = "0.1.0", package = "boltz-http-client" }
 icons = { path = "crates/icons" }
-media = { path = "crates/media" }
+media = { path = "crates/media", version = "0.1.0", package = "boltz-media" }
 menu = { path = "crates/menu" }
-refineable = { path = "crates/refineable" }
-scheduler = { path = "crates/scheduler" }
-sum_tree = { path = "crates/sum_tree" }
+refineable = { path = "crates/refineable", version = "0.1.0", package = "boltz-refineable" }
+scheduler = { path = "crates/scheduler", version = "0.1.0", package = "boltz-scheduler" }
+sum_tree = { path = "crates/sum_tree", version = "0.1.0", package = "boltz-sum-tree" }
 syntax_theme = { path = "crates/syntax_theme" }
 theme = { path = "crates/theme" }
 ui = { path = "crates/ui" }
 ui_macros = { path = "crates/ui_macros" }
-util = { path = "crates/util" }
-util_macros = { path = "crates/util_macros" }
-logging = { path = "crates/logging" }
-tracing_facade = { path = "crates/tracing_facade" }
-tracing_facade_macros = { path = "crates/tracing_facade_macros" }
+util = { path = "crates/util", version = "0.1.0", package = "boltz-util" }
+util_macros = { path = "crates/util_macros", version = "0.1.0", package = "boltz-util-macros" }
+logging = { path = "crates/logging", version = "0.1.0", package = "boltz-logging" }
+tracing_facade = { path = "crates/tracing_facade", version = "0.1.0", package = "boltz-tracing-facade" }
+tracing_facade_macros = { path = "crates/tracing_facade_macros", version = "0.1.0", package = "boltz-tracing-facade-macros" }
 anyhow = "1.0.86"
 ashpd = { version = "0.13", default-features = false, features = [
     "async-io",
@@ -248,19 +249,19 @@ split-debuginfo = "unpacked"
 debug = true
 
 [profile.dev.package]
-gpui_macros = { opt-level = 3 }
-derive_refineable = { opt-level = 3 }
+boltz-gpui-macros = { opt-level = 3 }
+boltz-derive-refineable = { opt-level = 3 }
 ui_macros = { opt-level = 3 }
-util_macros = { opt-level = 3 }
+boltz-util-macros = { opt-level = 3 }
 quote = { opt-level = 3 }
 syn = { opt-level = 3 }
 proc-macro2 = { opt-level = 3 }
 
 taffy = { opt-level = 3 }
 resvg = { opt-level = 3 }
-collections = { codegen-units = 1 }
+boltz-collections = { codegen-units = 1 }
 menu = { codegen-units = 1 }
-refineable = { codegen-units = 1 }
+boltz-refineable = { codegen-units = 1 }
 
 [profile.release]
 debug = "limited"

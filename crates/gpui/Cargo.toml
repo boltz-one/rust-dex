@@ -1,5 +1,5 @@
 [package]
-name = "gpui"
+name = "boltz-gpui"
 version = "0.2.2"
 edition.workspace = true
 description = "GPU-accelerated UI framework"
@@ -11,6 +11,7 @@ keywords = ["desktop", "gui", "immediate"]
 categories = ["gui"]
 
 
+repository.workspace = true
 [lints]
 workspace = true
 
