@@ -322,3 +322,15 @@ impl GlobalTheme {
         &cx.global::<Self>().icon_theme
     }
 }
+
+/// Switches the active appearance (light/dark), swapping in the matching
+/// built-in theme so `cx.theme().colors()` reflects the new mode. Components
+/// that read neutrals via the theme re-style automatically.
+pub fn set_appearance(appearance: Appearance, cx: &mut App) {
+    *SystemAppearance::global_mut(cx) = SystemAppearance(appearance);
+    let theme = match appearance {
+        Appearance::Light => crate::fallback_themes::default_light(),
+        Appearance::Dark => crate::fallback_themes::default_dark(),
+    };
+    GlobalTheme::update_theme(cx, Arc::new(theme));
+}
