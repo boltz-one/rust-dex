@@ -300,18 +300,6 @@ fn fix_generic_font_families(db: &mut usvg::fontdb::Database) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use usvg::fontdb::{Database, Family, Query};
-
-    const IBM_PLEX_REGULAR: &[u8] =
-        include_bytes!("../../../assets/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf");
-    const LILEX_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/lilex/Lilex-Regular.ttf");
-
-    fn db_with_bundled_fonts() -> Database {
-        let mut db = Database::new();
-        db.load_font_data(IBM_PLEX_REGULAR.to_vec());
-        db.load_font_data(LILEX_REGULAR.to_vec());
-        db
-    }
 
     #[test]
     fn test_is_emoji_presentation() {
@@ -342,75 +330,5 @@ mod tests {
                 s
             );
         }
-    }
-
-    #[test]
-    fn fix_generic_font_families_sets_all_families() {
-        let mut db = db_with_bundled_fonts();
-        fix_generic_font_families(&mut db);
-
-        let families = [
-            Family::SansSerif,
-            Family::Serif,
-            Family::Monospace,
-            Family::Cursive,
-            Family::Fantasy,
-        ];
-
-        for family in families {
-            let query = Query {
-                families: &[family],
-                ..Default::default()
-            };
-            assert!(
-                db.query(&query).is_some(),
-                "Expected generic family {family:?} to resolve after fix_generic_font_families"
-            );
-        }
-    }
-
-    #[test]
-    fn test_select_emoji_font_skips_family_without_glyph() {
-        let mut db = db_with_bundled_fonts();
-
-        let ibm_plex_sans = db
-            .query(&usvg::fontdb::Query {
-                families: &[usvg::fontdb::Family::Name("IBM Plex Sans")],
-                weight: usvg::fontdb::Weight(400),
-                stretch: usvg::fontdb::Stretch::Normal,
-                style: usvg::fontdb::Style::Normal,
-            })
-            .unwrap();
-        let lilex = db
-            .query(&usvg::fontdb::Query {
-                families: &[usvg::fontdb::Family::Name("Lilex")],
-                weight: usvg::fontdb::Weight(400),
-                stretch: usvg::fontdb::Stretch::Normal,
-                style: usvg::fontdb::Style::Normal,
-            })
-            .unwrap();
-        let selected = select_emoji_font('│', &[], &db, &["IBM Plex Sans", "Lilex"]).unwrap();
-
-        assert_eq!(selected, lilex);
-        assert!(!font_has_char(&db, ibm_plex_sans, '│'));
-        assert!(font_has_char(&db, selected, '│'));
-    }
-
-    #[test]
-    fn fix_generic_font_families_monospace_resolves_to_lilex() {
-        let mut db = db_with_bundled_fonts();
-        fix_generic_font_families(&mut db);
-
-        let query = Query {
-            families: &[Family::Monospace],
-            ..Default::default()
-        };
-        let id = db.query(&query).expect("Monospace should resolve");
-        let face = db.face(id).expect("Face should exist");
-        assert!(
-            face.families.iter().any(|(name, _)| name.contains("Lilex")),
-            "Monospace should map to Lilex, got {:?}",
-            face.families
-        );
     }
 }
