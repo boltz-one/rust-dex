@@ -14,15 +14,21 @@ pub use ui_macros::RegisterComponent;
 
 pub use crate::DynamicSpacing;
 pub use crate::animation::{AnimationDirection, AnimationDuration, DefaultAnimations};
+pub use crate::styles::focus_ring::{focus_ring, focus_ring_error, focus_ring_primary};
 pub use crate::styles::{
     PlatformStyle, Severity, StyledTypography, TextSize, rems_from_px, vh, vw,
 };
+pub use crate::styles::{Shadow, StyledShadow, palette, semantic};
 pub use crate::traits::clickable::*;
 pub use crate::traits::disableable::*;
 pub use crate::traits::fixed::*;
 pub use crate::traits::styled_ext::*;
 pub use crate::traits::toggleable::*;
 pub use crate::traits::visible_on_hover::*;
+pub use crate::{
+    Alert, Badge, BadgeColor, BadgeVariant, Card, CardVariant, Navbar, RadioButton, Select,
+    Sidebar, SidebarItem, TextInput, Textarea,
+};
 pub use crate::{Button, ButtonSize, ButtonStyle, IconButton, SelectableButton};
 pub use crate::{ButtonCommon, Color};
 pub use crate::{Headline, HeadlineSize};

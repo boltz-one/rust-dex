@@ -1,5 +1,8 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 
+use gpui::{AssetSource, Result, SharedString};
+use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
@@ -56,6 +59,7 @@ pub enum IconName {
     CaseSensitive,
     Chat,
     Check,
+    CheckCircle,
     CheckDouble,
     ChevronDown,
     ChevronDownUp,
@@ -271,8 +275,10 @@ pub enum IconName {
     UserRoundPen,
     Warning,
     WholeWord,
+    ExclamationTriangle,
     XCircle,
     XCircleFilled,
+    XMark,
 }
 
 impl IconName {
@@ -280,5 +286,28 @@ impl IconName {
     pub fn path(&self) -> Arc<str> {
         let file_stem: &'static str = self.into();
         format!("icons/{file_stem}.svg").into()
+    }
+}
+
+/// Embedded icon SVG assets (Heroicons, MIT-licensed).
+///
+/// Register at app startup with `Application::with_assets(icons::Assets)` so
+/// that `IconName::path()` (`icons/<name>.svg`) resolves via the SVG renderer.
+#[derive(RustEmbed)]
+#[folder = "assets"]
+#[include = "icons/**/*.svg"]
+#[include = "fonts/**/*.ttf"]
+pub struct Assets;
+
+impl AssetSource for Assets {
+    fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
+        Ok(Self::get(path).map(|f| f.data))
+    }
+
+    fn list(&self, path: &str) -> Result<Vec<SharedString>> {
+        Ok(Self::iter()
+            .filter(|p| p.starts_with(path))
+            .map(|p| SharedString::from(p.to_string()))
+            .collect())
     }
 }

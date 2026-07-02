@@ -1,0 +1,22 @@
+[package]
+name = "ui_gallery"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+license = "GPL-3.0-or-later"
+default-run = "ui_gallery"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "ui_gallery"
+path = "src/main.rs"
+
+[dependencies]
+component.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+icons.workspace = true
+theme.workspace = true
+ui.workspace = true

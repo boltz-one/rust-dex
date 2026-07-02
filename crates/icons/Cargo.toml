@@ -12,5 +12,7 @@ workspace = true
 path = "src/icons.rs"
 
 [dependencies]
+gpui.workspace = true
+rust-embed.workspace = true
 serde.workspace = true
 strum.workspace = true

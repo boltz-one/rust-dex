@@ -2487,6 +2487,8 @@ dependencies = [
 name = "icons"
 version = "0.1.0"
 dependencies = [
+ "gpui",
+ "rust-embed",
  "serde",
  "strum",
 ]
@@ -5540,6 +5542,18 @@ dependencies = [
  "theme",
  "ui_macros",
  "windows 0.61.3",
+]
+
+[[package]]
+name = "ui_gallery"
+version = "0.1.0"
+dependencies = [
+ "component",
+ "gpui",
+ "gpui_platform",
+ "icons",
+ "theme",
+ "ui",
 ]
 
 [[package]]
