@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use gpui::{FontStyle, FontWeight, HighlightStyle, Hsla, WindowBackgroundAppearance, hsla};
+use gpui::{FontStyle, FontWeight, HighlightStyle, Hsla, WindowBackgroundAppearance, hsla, rgb};
 
 use crate::{
     AccentColors, Appearance, DEFAULT_DARK_THEME, PlayerColors, StatusColors,
@@ -17,9 +17,69 @@ pub fn default_themes() -> ThemeFamily {
         id: "default".to_string(),
         name: "Default".into(),
         author: "".into(),
-        themes: vec![default_dark()],
+        themes: vec![default_dark(), default_light()],
         scales: default_color_scales(),
     }
+}
+
+/// A light theme whose neutral surfaces/text mirror the Tailwind slate ramp,
+/// derived from [`default_dark`] with only the neutral roles overridden.
+pub(crate) fn default_light() -> Theme {
+    fn c(hex: u32) -> Hsla {
+        rgb(hex).into()
+    }
+
+    let mut theme = default_dark();
+    theme.id = "one_light".to_string();
+    theme.name = "One Light".into();
+    theme.appearance = Appearance::Light;
+
+    let colors = &mut theme.styles.colors;
+    // Surfaces
+    colors.background = c(0xf8fafc); // slate-50
+    colors.surface_background = c(0xffffff);
+    colors.elevated_surface_background = c(0xffffff);
+    colors.editor_background = c(0xffffff);
+    colors.panel_background = c(0xf8fafc);
+    colors.status_bar_background = c(0xf8fafc);
+    colors.title_bar_background = c(0xf8fafc);
+    colors.title_bar_inactive_background = c(0xf1f5f9);
+    colors.toolbar_background = c(0xffffff);
+    colors.tab_bar_background = c(0xf1f5f9);
+    colors.tab_inactive_background = c(0xf1f5f9);
+    colors.tab_active_background = c(0xffffff);
+    // Borders
+    colors.border = c(0xe2e8f0); // slate-200
+    colors.border_variant = c(0xf1f5f9); // slate-100
+    colors.border_focused = c(0x3b82f6); // blue-500
+    colors.border_selected = c(0x3b82f6);
+    colors.border_disabled = c(0xe2e8f0);
+    // Interactive elements
+    colors.element_background = c(0xf1f5f9);
+    colors.element_hover = c(0xf1f5f9); // slate-100
+    colors.element_active = c(0xe2e8f0); // slate-200
+    colors.element_selected = c(0xe2e8f0);
+    colors.ghost_element_hover = c(0xf1f5f9);
+    colors.ghost_element_active = c(0xe2e8f0);
+    colors.ghost_element_selected = c(0xe2e8f0);
+    // Text
+    colors.text = c(0x0f172a); // slate-900
+    colors.text_muted = c(0x64748b); // slate-500
+    colors.text_placeholder = c(0x94a3b8); // slate-400
+    colors.text_disabled = c(0x94a3b8);
+    colors.text_accent = c(0x2563eb); // blue-600
+    // Icons
+    colors.icon = c(0x64748b);
+    colors.icon_muted = c(0x94a3b8);
+    colors.icon_disabled = c(0xcbd5e1); // slate-300
+    colors.icon_placeholder = c(0x94a3b8);
+    colors.icon_accent = c(0x2563eb);
+    // Scrollbar
+    colors.scrollbar_thumb_background = c(0xe2e8f0);
+    colors.scrollbar_thumb_hover_background = c(0xcbd5e1);
+    colors.scrollbar_track_background = c(0xf8fafc);
+
+    theme
 }
 
 // If a theme customizes a foreground version of a status color, but does not

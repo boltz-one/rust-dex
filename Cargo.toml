@@ -5,6 +5,7 @@ members = [
     "examples/ui_gallery",
     "crates/collections",
     "crates/component",
+    "crates/font_kit",
     "crates/gpui",
     "crates/gpui_linux",
     "crates/gpui_macos",
@@ -42,6 +43,7 @@ edition = "2024"
 collections = { path = "crates/collections", version = "0.1.0" }
 component = { path = "crates/component" }
 derive_refineable = { path = "crates/refineable/derive_refineable" }
+font_kit = { path = "crates/font_kit" }
 gpui = { path = "crates/gpui", default-features = false }
 gpui_shared_string = { path = "crates/gpui_shared_string" }
 gpui_linux = { path = "crates/gpui_linux", default-features = false }

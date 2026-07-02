@@ -1,85 +1,75 @@
-//! Appearance-aware neutral color roles.
+//! Theme-driven neutral color roles.
 //!
 //! Components read neutrals (surfaces, borders, text, hover backgrounds) from
 //! here rather than hardcoding palette grays, so dark and light both work
-//! automatically. Each role resolves to a light or dark palette swatch based on
-//! the active [`SystemAppearance`], so flipping the appearance re-themes the
-//! whole UI. Only accents/status come from [`crate::styles::palette`] directly.
+//! automatically: [`theme::set_appearance`] swaps the active theme and every
+//! role below follows `cx.theme().colors()`. Accents/status come from
+//! [`crate::styles::palette`] directly (mode-agnostic).
 
-use gpui::{App, Hsla, white};
-use theme::{Appearance, SystemAppearance};
-
-use crate::styles::palette;
-
-fn is_light(cx: &App) -> bool {
-    SystemAppearance::global(cx).0 == Appearance::Light
-}
-
-fn pick(cx: &App, light: Hsla, dark: Hsla) -> Hsla {
-    if is_light(cx) { light } else { dark }
-}
+use gpui::{App, Hsla};
+use theme::ActiveTheme;
 
 /// Base app background.
 pub fn background(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(100), palette::neutral(950))
+    cx.theme().colors().background
 }
 
 /// Primary surface for cards, panels, inputs.
 pub fn surface(cx: &App) -> Hsla {
-    pick(cx, white(), palette::neutral(900))
+    cx.theme().colors().surface_background
 }
 
 /// Raised surface for popovers, dropdowns, modals.
 pub fn elevated_surface(cx: &App) -> Hsla {
-    pick(cx, white(), palette::neutral(800))
+    cx.theme().colors().elevated_surface_background
 }
 
 /// Default border.
 pub fn border(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(200), palette::neutral(700))
+    cx.theme().colors().border
 }
 
 /// Muted/subtle border.
 pub fn border_muted(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(100), palette::neutral(800))
+    cx.theme().colors().border_variant
 }
 
 /// Border color for focused elements (also see `focus_ring`).
-pub fn border_focused(_cx: &App) -> Hsla {
-    palette::primary(500)
+pub fn border_focused(cx: &App) -> Hsla {
+    cx.theme().colors().border_focused
 }
 
 /// Primary text.
 pub fn text(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(900), palette::neutral(100))
+    cx.theme().colors().text
 }
 
 /// Secondary/muted text.
 pub fn text_muted(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(500), palette::neutral(400))
+    cx.theme().colors().text_muted
 }
 
 /// Placeholder text.
 pub fn text_placeholder(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(400), palette::neutral(500))
+    cx.theme().colors().text_placeholder
 }
 
 /// Hover background for interactive neutral elements.
 pub fn hover_bg(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(100), palette::neutral(800))
+    cx.theme().colors().element_hover
 }
 
 /// Active/pressed background for interactive neutral elements.
 pub fn active_bg(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(200), palette::neutral(700))
+    cx.theme().colors().element_active
 }
 
 /// Default icon color.
 pub fn icon(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(500), palette::neutral(400))
+    cx.theme().colors().icon
 }
 
 /// Muted icon color.
 pub fn icon_muted(cx: &App) -> Hsla {
-    pick(cx, palette::neutral(400), palette::neutral(500))
+    cx.theme().colors().icon_muted
 }
