@@ -132,6 +132,7 @@ parking_lot = "0.12.1"
 percent-encoding = "2.3.2"
 proc-macro2 = "1.0.93"
 profiling = "1"
+pretty_assertions = "1.4"
 proptest = { version = "1.10.0", features = ["attr-macro"] }
 pollster = "0.4.0"
 quote = "1.0.9"
