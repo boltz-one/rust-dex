@@ -11,12 +11,12 @@
 //! A loader that uses Apple's Core Text API to load and rasterize fonts.
 
 use byteorder::{BigEndian, ReadBytesExt};
-use core_graphics::base::{kCGImageAlphaPremultipliedLast, CGFloat};
+use core_graphics::base::{CGFloat, kCGImageAlphaPremultipliedLast};
 use core_graphics::color_space::CGColorSpace;
 use core_graphics::context::{CGContext, CGTextDrawingMode};
 use core_graphics::font::{CGFont, CGGlyph};
-use core_graphics::geometry::{CGAffineTransform, CGPoint, CGRect, CGSize};
 use core_graphics::geometry::{CG_AFFINE_TRANSFORM_IDENTITY, CG_ZERO_POINT, CG_ZERO_SIZE};
+use core_graphics::geometry::{CGAffineTransform, CGPoint, CGRect, CGSize};
 use core_graphics::path::CGPathElementType;
 use core_text;
 use core_text::font::CTFont;
@@ -264,11 +264,7 @@ impl Font {
                 .get_glyphs_for_characters(src.as_ptr(), dest.as_mut_ptr(), 2);
 
             let id = dest[0] as u32;
-            if id != 0 {
-                Some(id)
-            } else {
-                None
-            }
+            if id != 0 { Some(id) } else { None }
         }
     }
 
@@ -824,9 +820,11 @@ fn unpack_otc_font(data: &mut [u8], font_index: u32) -> Result<(), FontLoadingEr
 
     let offset_table_pos =
         get_slice_from_start(&data, offset_table_pos_pos)?.read_u32::<BigEndian>()? as usize;
-    debug_assert!(utils::SFNT_VERSIONS
-        .iter()
-        .any(|version| { data[offset_table_pos..(offset_table_pos + 4)] == *version }));
+    debug_assert!(
+        utils::SFNT_VERSIONS
+            .iter()
+            .any(|version| { data[offset_table_pos..(offset_table_pos + 4)] == *version })
+    );
     let num_tables = get_slice_from_start(&data, offset_table_pos + 4)?.read_u16::<BigEndian>()?;
 
     // Must copy forward in order to avoid problems with overlapping memory.
