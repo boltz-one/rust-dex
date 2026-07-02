@@ -26,8 +26,8 @@ pub use crate::traits::styled_ext::*;
 pub use crate::traits::toggleable::*;
 pub use crate::traits::visible_on_hover::*;
 pub use crate::{
-    Alert, Badge, BadgeColor, BadgeVariant, Card, CardVariant, Navbar, RadioButton, Select,
-    Sidebar, SidebarItem, TextInput, Textarea,
+    Alert, Badge, BadgeColor, BadgeVariant, Card, CardVariant, Checkbox, Navbar, RadioButton,
+    Select, Sidebar, SidebarItem, Switch, TextInput, Textarea,
 };
 pub use crate::{Button, ButtonSize, ButtonStyle, IconButton, SelectableButton};
 pub use crate::{ButtonCommon, Color};

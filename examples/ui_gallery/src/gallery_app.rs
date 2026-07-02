@@ -67,6 +67,22 @@ impl GalleryApp {
                     .child(RadioButton::new("plan-pro").label("Pro"))
                     .into_any_element(),
             ))
+            .child(field(
+                "Preferences",
+                v_flex()
+                    .gap_2()
+                    .child(Checkbox::new("chk-updates", ToggleState::Selected))
+                    .child(Checkbox::new("chk-marketing", ToggleState::Unselected))
+                    .into_any_element(),
+            ))
+            .child(field(
+                "Notifications",
+                h_flex()
+                    .gap_3()
+                    .child(Switch::new("sw-on", ToggleState::Selected))
+                    .child(Switch::new("sw-off", ToggleState::Unselected))
+                    .into_any_element(),
+            ))
             .into_any_element()
     }
 }
@@ -155,7 +171,7 @@ impl Render for GalleryApp {
                                         } else {
                                             Appearance::Light
                                         };
-                                        *SystemAppearance::global_mut(cx) = SystemAppearance(next);
+                                        theme::set_appearance(next, cx);
                                         cx.notify();
                                     },
                                 )),
