@@ -4,9 +4,21 @@ use smallvec::SmallVec;
 use crate::Tab;
 use crate::prelude::*;
 
+/// Visual style for [`TabBar`] and its child [`Tab`]s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TabBarStyle {
+    /// Bottom-border container line; the active tab shows a colored
+    /// underline. Preserves the existing default look for current callers.
+    #[default]
+    Underline,
+    /// Rounded pill container; the active tab shows a raised pill background.
+    Pills,
+}
+
 #[derive(IntoElement, RegisterComponent)]
 pub struct TabBar {
     id: ElementId,
+    style: TabBarStyle,
     start_children: SmallVec<[AnyElement; 2]>,
     children: SmallVec<[AnyElement; 2]>,
     end_children: SmallVec<[AnyElement; 2]>,
@@ -17,11 +29,18 @@ impl TabBar {
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
+            style: TabBarStyle::default(),
             start_children: SmallVec::new(),
             children: SmallVec::new(),
             end_children: SmallVec::new(),
             scroll_handle: None,
         }
+    }
+
+    /// Sets the visual style (default [`TabBarStyle::Underline`]).
+    pub fn style(mut self, style: TabBarStyle) -> Self {
+        self.style = style;
+        self
     }
 
     pub fn track_scroll(mut self, scroll_handle: &ScrollHandle) -> Self {
@@ -91,6 +110,45 @@ impl ParentElement for TabBar {
 
 impl RenderOnce for TabBar {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let style = self.style;
+
+        let tabs_row = h_flex()
+            .id("tabs")
+            .flex_grow()
+            .overflow_x_scroll()
+            .when(style == TabBarStyle::Underline, |this| this.gap_8())
+            .when(style == TabBarStyle::Pills, |this| this.gap_2())
+            .when_some(self.scroll_handle, |this, scroll_handle| {
+                this.track_scroll(&scroll_handle)
+            })
+            .children(self.children);
+
+        let middle = match style {
+            TabBarStyle::Underline => div()
+                .relative()
+                .flex_1()
+                .h_full()
+                .overflow_x_hidden()
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full()
+                        .border_b_1()
+                        .border_color(semantic::border_muted(cx)),
+                )
+                .child(tabs_row)
+                .into_any_element(),
+            TabBarStyle::Pills => div()
+                .flex_1()
+                .p_1()
+                .rounded_lg()
+                .bg(semantic::elevated_surface(cx))
+                .child(tabs_row)
+                .into_any_element(),
+        };
+
         div()
             .id(self.id)
             .group("tab_bar")
@@ -98,7 +156,7 @@ impl RenderOnce for TabBar {
             .flex_none()
             .w_full()
             .h(Tab::container_height(cx))
-            .bg(cx.theme().colors().tab_bar_background)
+            .bg(semantic::surface(cx))
             .when(!self.start_children.is_empty(), |this| {
                 this.child(
                     h_flex()
@@ -107,43 +165,18 @@ impl RenderOnce for TabBar {
                         .px(DynamicSpacing::Base06.rems(cx))
                         .border_b_1()
                         .border_r_1()
-                        .border_color(cx.theme().colors().border)
+                        .border_color(semantic::border_muted(cx))
                         .children(self.start_children),
                 )
             })
-            .child(
-                div()
-                    .relative()
-                    .flex_1()
-                    .h_full()
-                    .overflow_x_hidden()
-                    .child(
-                        div()
-                            .absolute()
-                            .top_0()
-                            .left_0()
-                            .size_full()
-                            .border_b_1()
-                            .border_color(cx.theme().colors().border),
-                    )
-                    .child(
-                        h_flex()
-                            .id("tabs")
-                            .flex_grow()
-                            .overflow_x_scroll()
-                            .when_some(self.scroll_handle, |cx, scroll_handle| {
-                                cx.track_scroll(&scroll_handle)
-                            })
-                            .children(self.children),
-                    ),
-            )
+            .child(middle)
             .when(!self.end_children.is_empty(), |this| {
                 this.child(
                     h_flex()
                         .flex_none()
                         .gap(DynamicSpacing::Base04.rems(cx))
                         .px(DynamicSpacing::Base06.rems(cx))
-                        .border_color(cx.theme().colors().border)
+                        .border_color(semantic::border_muted(cx))
                         .border_b_1()
                         .border_l_1()
                         .children(self.end_children),
@@ -171,21 +204,40 @@ impl Component for TabBar {
                 .gap_6()
                 .children(vec![
                     example_group_with_title(
-                        "Basic Usage",
-                        vec![
-                            single_example(
-                                "Empty TabBar",
-                                TabBar::new("empty_tab_bar").into_any_element(),
-                            ),
-                            single_example(
-                                "With Tabs",
-                                TabBar::new("tab_bar_with_tabs")
-                                    .child(Tab::new("tab1"))
-                                    .child(Tab::new("tab2"))
-                                    .child(Tab::new("tab3"))
-                                    .into_any_element(),
-                            ),
-                        ],
+                        "Underline (default)",
+                        vec![single_example(
+                            "With Tabs",
+                            TabBar::new("underline_tab_bar")
+                                .child(Tab::new("u_tab1").toggle_state(true).child("Overview"))
+                                .child(Tab::new("u_tab2").child("Activity"))
+                                .child(Tab::new("u_tab3").child("Settings"))
+                                .into_any_element(),
+                        )],
+                    ),
+                    example_group_with_title(
+                        "Pills",
+                        vec![single_example(
+                            "With Tabs",
+                            TabBar::new("pills_tab_bar")
+                                .style(TabBarStyle::Pills)
+                                .child(
+                                    Tab::new("p_tab1")
+                                        .style(TabBarStyle::Pills)
+                                        .toggle_state(true)
+                                        .child("Overview"),
+                                )
+                                .child(
+                                    Tab::new("p_tab2")
+                                        .style(TabBarStyle::Pills)
+                                        .child("Activity"),
+                                )
+                                .child(
+                                    Tab::new("p_tab3")
+                                        .style(TabBarStyle::Pills)
+                                        .child("Settings"),
+                                )
+                                .into_any_element(),
+                        )],
                     ),
                     example_group_with_title(
                         "With Start and End Children",

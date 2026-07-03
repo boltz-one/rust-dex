@@ -1,4 +1,5 @@
 mod button;
+mod button_group;
 mod button_like;
 mod button_link;
 mod copy_button;
@@ -7,6 +8,7 @@ mod split_button;
 mod toggle_button;
 
 pub use button::*;
+pub use button_group::*;
 pub use button_like::*;
 pub use button_link::*;
 pub use copy_button::*;

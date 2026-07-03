@@ -251,18 +251,16 @@ impl RenderOnce for ListItem {
                     if focused && !self.disabled {
                         this.border_1()
                             .when(self.docked_right, |this| this.border_r_2())
-                            .border_color(cx.theme().colors().border_focused)
+                            .border_color(semantic::border_focused(cx))
                     } else {
                         this.border_1()
                     }
                 })
                 .when(self.selectable && !self.disabled, |this| {
-                    this.hover(|style| style.bg(cx.theme().colors().ghost_element_hover))
-                        .active(|style| style.bg(cx.theme().colors().ghost_element_active))
+                    this.hover(|style| style.bg(semantic::hover_bg(cx)))
+                        .active(|style| style.bg(semantic::active_bg(cx)))
                         .when(self.outlined, |this| this.rounded_sm())
-                        .when(self.selected, |this| {
-                            this.bg(cx.theme().colors().ghost_element_selected)
-                        })
+                        .when(self.selected, |this| this.bg(semantic::active_bg(cx)))
                 })
             })
             .when(self.rounded, |this| this.rounded_sm())
@@ -283,18 +281,15 @@ impl RenderOnce for ListItem {
                     .when(self.inset, |this| {
                         this.when_some(self.focused, |this, focused| {
                             if focused && !self.disabled {
-                                this.border_1()
-                                    .border_color(cx.theme().colors().border_focused)
+                                this.border_1().border_color(semantic::border_focused(cx))
                             } else {
                                 this.border_1()
                             }
                         })
                         .when(self.selectable && !self.disabled, |this| {
-                            this.hover(|style| style.bg(cx.theme().colors().ghost_element_hover))
-                                .active(|style| style.bg(cx.theme().colors().ghost_element_active))
-                                .when(self.selected, |this| {
-                                    this.bg(cx.theme().colors().ghost_element_selected)
-                                })
+                            this.hover(|style| style.bg(semantic::hover_bg(cx)))
+                                .active(|style| style.bg(semantic::active_bg(cx)))
+                                .when(self.selected, |this| this.bg(semantic::active_bg(cx)))
                         })
                     })
                     .when_some(
@@ -303,7 +298,7 @@ impl RenderOnce for ListItem {
                     )
                     .when(self.outlined, |this| {
                         this.border_1()
-                            .border_color(cx.theme().colors().border)
+                            .border_color(semantic::border(cx))
                             .rounded_sm()
                             .overflow_hidden()
                     })

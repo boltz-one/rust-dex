@@ -1,10 +1,9 @@
 use gpui::{
-    AnyElement, AnyView, ClickEvent, ElementId, Hsla, IntoElement, KeybindingKeystroke, Keystroke,
-    Styled, Window, div, hsla, prelude::*,
+    Animation, AnimationExt, AnyElement, AnyView, ClickEvent, ElementId, Hsla, IntoElement,
+    KeybindingKeystroke, Keystroke, Styled, Window, div, ease_out_quint, hsla, prelude::*, white,
 };
 use std::{rc::Rc, sync::Arc};
 
-use crate::utils::is_light;
 use crate::{Color, Icon, IconName, ToggleState, Tooltip};
 use crate::{ElevationIndex, KeyBinding, prelude::*};
 
@@ -53,6 +52,7 @@ pub struct Checkbox {
     label_color: Color,
     tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView>>,
     on_click: Option<Box<dyn Fn(&ToggleState, &ClickEvent, &mut Window, &mut App) + 'static>>,
+    tab_index: Option<isize>,
 }
 
 impl Checkbox {
@@ -71,7 +71,16 @@ impl Checkbox {
             label_color: Color::Muted,
             tooltip: None,
             on_click: None,
+            tab_index: None,
         }
+    }
+
+    /// Enables keyboard focus (tab stop) and shows a primary-color focus ring
+    /// on keyboard focus, using the same native `focus_visible` mechanism as
+    /// [`Switch::tab_index`].
+    pub fn tab_index(mut self, tab_index: isize) -> Self {
+        self.tab_index = Some(tab_index);
+        self
     }
 
     /// Sets the disabled state of the [`Checkbox`].
@@ -154,26 +163,42 @@ impl Checkbox {
 }
 
 impl Checkbox {
+    fn checked(&self) -> bool {
+        matches!(
+            self.toggle_state,
+            ToggleState::Selected | ToggleState::Indeterminate
+        )
+    }
+
     fn bg_color(&self, cx: &App) -> Hsla {
-        let style = self.style.clone();
-        match (style, self.filled) {
-            (ToggleStyle::Ghost, false) => cx.theme().colors().ghost_element_background,
-            (ToggleStyle::Ghost, true) => cx.theme().colors().element_background,
-            (ToggleStyle::ElevationBased(_), false) => gpui::transparent_black(),
-            (ToggleStyle::ElevationBased(elevation), true) => elevation.darker_bg(cx),
-            (ToggleStyle::Custom(_), false) => gpui::transparent_black(),
-            (ToggleStyle::Custom(color), true) => color.opacity(0.2),
+        if self.disabled {
+            return semantic::border_muted(cx).opacity(0.6);
+        }
+
+        let checked = self.checked();
+        match self.style.clone() {
+            ToggleStyle::Ghost if checked => palette::primary(600),
+            ToggleStyle::Ghost if self.filled => semantic::surface(cx),
+            ToggleStyle::Ghost => gpui::transparent_black(),
+            ToggleStyle::ElevationBased(_) if checked => palette::primary(600),
+            ToggleStyle::ElevationBased(elevation) if self.filled => elevation.darker_bg(cx),
+            ToggleStyle::ElevationBased(_) => gpui::transparent_black(),
+            ToggleStyle::Custom(color) if checked => color,
+            ToggleStyle::Custom(color) if self.filled => color.opacity(0.2),
+            ToggleStyle::Custom(_) => gpui::transparent_black(),
         }
     }
 
     fn border_color(&self, cx: &App) -> Hsla {
         if self.disabled {
-            return cx.theme().colors().border_variant;
+            return semantic::border_muted(cx);
         }
 
         match self.style.clone() {
-            ToggleStyle::Ghost => cx.theme().colors().border,
-            ToggleStyle::ElevationBased(_) => cx.theme().colors().border,
+            ToggleStyle::Ghost | ToggleStyle::ElevationBased(_) if self.checked() => {
+                palette::primary(600)
+            }
+            ToggleStyle::Ghost | ToggleStyle::ElevationBased(_) => semantic::border(cx),
             ToggleStyle::Custom(color) => color.opacity(0.3),
         }
     }
@@ -186,8 +211,16 @@ impl Checkbox {
 impl RenderOnce for Checkbox {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let group_id = format!("checkbox_group_{:?}", self.id);
+        let is_solid_style = matches!(
+            self.style,
+            ToggleStyle::Ghost | ToggleStyle::ElevationBased(_)
+        );
         let color = if self.disabled {
             Color::Disabled
+        } else if self.checked() && is_solid_style {
+            // Checked, token-driven styles get a filled `palette::primary(600)`
+            // background, so the check/dash icon is drawn in white for contrast.
+            Color::Custom(white())
         } else {
             Color::Selected
         };
@@ -216,6 +249,7 @@ impl RenderOnce for Checkbox {
 
         let size = Self::container_size();
 
+        let tab_index = self.tab_index;
         let checkbox = h_flex()
             .group(group_id.clone())
             .id(self.id.clone())
@@ -223,6 +257,7 @@ impl RenderOnce for Checkbox {
             .justify_center()
             .child(
                 div()
+                    .id((self.id.clone(), "box"))
                     .flex()
                     .flex_none()
                     .justify_center()
@@ -234,11 +269,14 @@ impl RenderOnce for Checkbox {
                     .border_1()
                     .border_color(border_color)
                     .when(self.disabled, |this| this.cursor_not_allowed())
-                    .when(self.disabled, |this| {
-                        this.bg(cx.theme().colors().element_disabled.opacity(0.6))
-                    })
                     .when(!self.disabled && !self.visualization, |this| {
                         this.group_hover(group_id.clone(), |el| el.border_color(hover_border_color))
+                    })
+                    .when_some(tab_index.filter(|_| !self.disabled), |this, tab_index| {
+                        this.tab_index(tab_index).focus_visible(|mut style| {
+                            style.border_color = Some(palette::primary(500));
+                            style
+                        })
                     })
                     .when(self.placeholder, |this| {
                         this.child(
@@ -295,20 +333,16 @@ pub enum SwitchColor {
 }
 
 impl SwitchColor {
+    /// Returns `(track_background, track_border)`. Off is always a neutral
+    /// `semantic::border_muted`/`semantic::border` pair; on uses
+    /// `palette::primary(600)` for [`SwitchColor::Accent`].
     fn get_colors(&self, is_on: bool, cx: &App) -> (Hsla, Hsla) {
         if !is_on {
-            return (
-                cx.theme().colors().element_disabled,
-                cx.theme().colors().border,
-            );
+            return (semantic::border_muted(cx), semantic::border(cx));
         }
 
         match self {
-            SwitchColor::Accent => {
-                let status = cx.theme().status();
-                let colors = cx.theme().colors();
-                (status.info.opacity(0.4), colors.text_accent.opacity(0.2))
-            }
+            SwitchColor::Accent => (palette::primary(600), palette::primary(600)),
             SwitchColor::Custom(color) => (*color, color.opacity(0.6)),
         }
     }
@@ -424,42 +458,67 @@ impl Switch {
     }
 }
 
+/// Track width/height and thumb geometry for [`Switch`] (44×24px track,
+/// 20px thumb, 2px inset — matches the Tailwind UI switch spec).
+const SWITCH_TRACK_W: f32 = 44.0;
+const SWITCH_TRACK_H: f32 = 24.0;
+const SWITCH_THUMB_SIZE: f32 = 20.0;
+const SWITCH_THUMB_INSET: f32 = 2.0;
+
 impl RenderOnce for Switch {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let is_on = self.toggle_state == ToggleState::Selected;
-        let adjust_ratio = if is_light(cx) { 1.5 } else { 1.0 };
-
-        let base_color = cx.theme().colors().text;
-        let thumb_color = base_color;
         let (bg_color, border_color) = self.color.get_colors(is_on, cx);
 
         let bg_hover_color = if is_on {
-            bg_color.blend(base_color.opacity(0.16 * adjust_ratio))
+            palette::primary(700)
         } else {
-            bg_color.blend(base_color.opacity(0.05 * adjust_ratio))
+            semantic::hover_bg(cx)
         };
 
-        let thumb_opacity = match (is_on, self.disabled) {
-            (_, true) => 0.2,
-            (true, false) => 1.0,
-            (false, false) => 0.5,
-        };
+        let thumb_opacity = if self.disabled { 0.5 } else { 1.0 };
 
         let group_id = format!("switch_group_{:?}", self.id);
         let label = self.label;
+
+        // Thumb slide: keyed on (id, is_on) so a fresh animation plays each
+        // time the toggle flips (reuses the existing `with_animation` +
+        // `AnimationDuration` mechanism, no new animation primitive added).
+        let thumb_off_pos = SWITCH_THUMB_INSET;
+        let thumb_on_pos = SWITCH_TRACK_W - SWITCH_THUMB_SIZE - SWITCH_THUMB_INSET;
+        let thumb_key = format!("switch-thumb-{:?}-{is_on}", self.id);
+        let thumb = div()
+            .absolute()
+            .top(px(SWITCH_THUMB_INSET))
+            .size(px(SWITCH_THUMB_SIZE))
+            .rounded_full()
+            .bg(white())
+            .opacity(thumb_opacity)
+            .with_animation(
+                thumb_key,
+                Animation::new(AnimationDuration::Fast.duration()).with_easing(ease_out_quint()),
+                move |thumb, delta| {
+                    let (start, end) = if is_on {
+                        (thumb_off_pos, thumb_on_pos)
+                    } else {
+                        (thumb_on_pos, thumb_off_pos)
+                    };
+                    thumb.left(px(start + delta * (end - start)))
+                },
+            );
 
         let switch = div()
             .id((self.id.clone(), "switch"))
             .p(px(1.0))
             .border_2()
-            .border_color(cx.theme().colors().border_transparent)
+            .border_color(gpui::transparent_black())
             .rounded_full()
             .when_some(
                 self.tab_index.filter(|_| !self.disabled),
                 |this, tab_index| {
                     this.tab_index(tab_index)
                         .focus_visible(|mut style| {
-                            style.border_color = Some(cx.theme().colors().border_focused);
+                            style.border_color = Some(palette::primary(500));
                             style
                         })
                         .when_some(self.on_click.clone(), |this, on_click| {
@@ -471,30 +530,18 @@ impl RenderOnce for Switch {
             )
             .child(
                 h_flex()
-                    .w(DynamicSpacing::Base32.rems(cx))
-                    .h(DynamicSpacing::Base20.rems(cx))
+                    .relative()
+                    .w(px(SWITCH_TRACK_W))
+                    .h(px(SWITCH_TRACK_H))
                     .group(group_id.clone())
-                    .child(
-                        h_flex()
-                            .when(is_on, |on| on.justify_end())
-                            .when(!is_on, |off| off.justify_start())
-                            .size_full()
-                            .rounded_full()
-                            .px(DynamicSpacing::Base02.px(cx))
-                            .bg(bg_color)
-                            .when(!self.disabled, |this| {
-                                this.group_hover(group_id.clone(), |el| el.bg(bg_hover_color))
-                            })
-                            .border_1()
-                            .border_color(border_color)
-                            .child(
-                                div()
-                                    .size(DynamicSpacing::Base12.rems(cx))
-                                    .rounded_full()
-                                    .bg(thumb_color)
-                                    .opacity(thumb_opacity),
-                            ),
-                    ),
+                    .rounded_full()
+                    .bg(bg_color)
+                    .when(!self.disabled, |this| {
+                        this.group_hover(group_id.clone(), |el| el.bg(bg_hover_color))
+                    })
+                    .border_1()
+                    .border_color(border_color)
+                    .child(thumb),
             );
 
         h_flex()

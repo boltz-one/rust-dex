@@ -22,8 +22,8 @@ impl CircularProgress {
             max_value,
             size,
             stroke_width: px(4.0),
-            bg_color: cx.theme().colors().border_variant,
-            progress_color: cx.theme().status().info,
+            bg_color: semantic::border_muted(cx),
+            progress_color: palette::primary(600),
         }
     }
 

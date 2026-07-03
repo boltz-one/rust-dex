@@ -23,9 +23,9 @@ impl ProgressBar {
             id: id.into(),
             value,
             max_value,
-            bg_color: cx.theme().colors().background,
-            over_color: cx.theme().status().error,
-            fg_color: cx.theme().status().info,
+            bg_color: semantic::border_muted(cx),
+            over_color: palette::danger(600),
+            fg_color: palette::primary(600),
         }
     }
 

@@ -31,6 +31,7 @@ use super::Avatar;
 pub struct Facepile {
     base: Div,
     faces: SmallVec<[AnyElement; 2]>,
+    max_visible: Option<usize>,
 }
 
 impl Facepile {
@@ -41,7 +42,18 @@ impl Facepile {
 
     /// Creates a new facepile with the given faces.
     pub fn new(faces: SmallVec<[AnyElement; 2]>) -> Self {
-        Self { base: div(), faces }
+        Self {
+            base: div(),
+            faces,
+            max_visible: None,
+        }
+    }
+
+    /// Caps the number of visible faces, replacing the rest with a `+N`
+    /// overflow indicator.
+    pub fn max_visible(mut self, max: usize) -> Self {
+        self.max_visible = Some(max);
+        self
     }
 }
 
@@ -63,7 +75,36 @@ impl Facepile {
 }
 
 impl RenderOnce for Facepile {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let total = self.faces.len();
+        let mut faces = self.faces;
+
+        // If capped, trim to `max_visible` and append a `+N` overflow badge
+        // (rendered on top, at the front of the stack).
+        if let Some(max) = self.max_visible {
+            if total > max {
+                let overflow = total - max;
+                faces.truncate(max);
+                faces.push(
+                    div()
+                        .size_6()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded_full()
+                        .border_2()
+                        .border_color(semantic::surface(cx))
+                        .bg(semantic::elevated_surface(cx))
+                        .child(
+                            Label::new(format!("+{overflow}"))
+                                .size(LabelSize::XSmall)
+                                .color(Color::Custom(semantic::text_muted(cx))),
+                        )
+                        .into_any_element(),
+                );
+            }
+        }
+
         // Lay the faces out in reverse so they overlap in the desired order (left to right, front to back)
         self.base
             .flex()
@@ -71,7 +112,7 @@ impl RenderOnce for Facepile {
             .items_center()
             .justify_start()
             .children(
-                self.faces
+                faces
                     .into_iter()
                     .enumerate()
                     .rev()
@@ -127,6 +168,18 @@ impl Component for Facepile {
                             )
                             .into_any_element(),
                         ),
+                        single_example(
+                            "Overflow Count",
+                            Facepile::new(
+                                EXAMPLE_FACES
+                                    .iter()
+                                    .map(|&url| Avatar::new(url).into_any_element())
+                                    .collect(),
+                            )
+                            .max_visible(3)
+                            .into_any_element(),
+                        )
+                        .description("Caps visible faces and shows a `+N` overflow indicator."),
                     ],
                 )])
                 .into_any_element(),

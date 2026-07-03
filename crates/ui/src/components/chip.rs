@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use gpui::{AnyElement, AnyView, Hsla, IntoElement, ParentElement, Styled};
+use gpui::{AnyElement, AnyView, ClickEvent, Hsla, IntoElement, ParentElement, Styled};
 
 /// Chips provide a container for an informative label.
 ///
@@ -21,6 +21,8 @@ pub struct Chip {
     border_color: Option<Hsla>,
     height: Option<Pixels>,
     truncate: bool,
+    pill: bool,
+    on_dismiss: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
     tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView + 'static>>,
 }
 
@@ -37,6 +39,8 @@ impl Chip {
             border_color: None,
             height: None,
             truncate: false,
+            pill: false,
+            on_dismiss: None,
             tooltip: None,
         }
     }
@@ -89,6 +93,21 @@ impl Chip {
         self
     }
 
+    /// Uses fully-rounded (`rounded_full`) corners instead of `rounded_md`.
+    pub fn pill(mut self, pill: bool) -> Self {
+        self.pill = pill;
+        self
+    }
+
+    /// Adds a dismiss ("x") affordance; clicking it invokes `on_dismiss`.
+    pub fn dismissible(
+        mut self,
+        on_dismiss: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_dismiss = Some(Box::new(on_dismiss));
+        self
+    }
+
     pub fn tooltip(mut self, tooltip: impl Fn(&mut Window, &mut App) -> AnyView + 'static) -> Self {
         self.tooltip = Some(Box::new(tooltip));
         self
@@ -97,20 +116,20 @@ impl Chip {
 
 impl RenderOnce for Chip {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let bg_color = self
-            .bg_color
-            .unwrap_or(cx.theme().colors().element_background);
-
-        let border_color = self.border_color.unwrap_or(cx.theme().colors().border);
+        let bg_color = self.bg_color.unwrap_or_else(|| semantic::surface(cx));
+        let border_color = self.border_color.unwrap_or_else(|| semantic::border(cx));
+        let pill = self.pill;
 
         h_flex()
             .when_some(self.height, |this, h| this.h(h))
             .when(self.truncate, |this| this.min_w_0())
             .when(!self.truncate, |this| this.flex_none())
-            .gap_0p5()
-            .px_1()
+            .gap_1()
+            .px_2()
+            .py_0p5()
             .border_1()
-            .rounded_sm()
+            .when(pill, |this| this.rounded_full())
+            .when(!pill, |this| this.rounded_md())
             .border_color(border_color)
             .bg(bg_color)
             .overflow_hidden()
@@ -129,6 +148,22 @@ impl RenderOnce for Chip {
                     .truncate(),
             )
             .id(self.label.clone())
+            .when_some(self.on_dismiss, |this, on_dismiss| {
+                this.child(
+                    div()
+                        .id("dismiss")
+                        .cursor_pointer()
+                        .child(
+                            Icon::new(IconName::XMark)
+                                .size(IconSize::XSmall)
+                                .color(Color::Muted),
+                        )
+                        .on_click(move |event, window, cx| {
+                            cx.stop_propagation();
+                            on_dismiss(event, window, cx)
+                        }),
+                )
+            })
             .when_some(self.tooltip, |this, tooltip| this.tooltip(tooltip))
     }
 }
@@ -138,9 +173,13 @@ impl Component for Chip {
         ComponentScope::DataDisplay
     }
 
-    fn preview(_window: &mut Window, cx: &mut App) -> Option<AnyElement> {
+    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
         let chip_examples = vec![
             single_example("Default", Chip::new("Chip Example").into_any_element()),
+            single_example(
+                "Pill",
+                Chip::new("Chip Example").pill(true).into_any_element(),
+            ),
             single_example(
                 "Customized Label Color",
                 Chip::new("Chip Example")
@@ -155,9 +194,15 @@ impl Component for Chip {
                     .into_any_element(),
             ),
             single_example(
-                "Customized Background Color",
+                "With Icon",
                 Chip::new("Chip Example")
-                    .bg_color(cx.theme().colors().text_accent.opacity(0.1))
+                    .icon(IconName::Check)
+                    .into_any_element(),
+            ),
+            single_example(
+                "Dismissible",
+                Chip::new("Chip Example")
+                    .dismissible(|_, _, _| {})
                     .into_any_element(),
             ),
         ];

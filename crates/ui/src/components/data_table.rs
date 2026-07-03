@@ -1,21 +1,22 @@
 use std::{ops::Range, rc::Rc};
 
 use crate::{
-    ActiveTheme as _, AnyElement, App, Button, ButtonCommon as _, ButtonStyle, Color, Component,
-    ComponentScope, Context, Div, DraggedColumn, ElementId, FixedWidth as _, FluentBuilder as _,
-    HeaderResizeInfo, Indicator, InteractiveElement, IntoElement, ParentElement, Pixels,
-    RESIZE_DIVIDER_WIDTH, RedistributableColumnsState, RegisterComponent, RenderOnce, ScrollAxes,
-    ScrollableHandle, Scrollbars, SharedString, StatefulInteractiveElement, Styled, StyledExt as _,
-    StyledTypography, TableResizeBehavior, Window, WithScrollbar, bind_redistributable_columns,
-    div, example_group_with_title, h_flex, px, render_column_resize_divider,
+    AnyElement, App, Button, ButtonCommon as _, ButtonStyle, Color, Component, ComponentScope,
+    Context, Div, DraggedColumn, ElementId, FixedWidth as _, FluentBuilder as _, HeaderResizeInfo,
+    Indicator, InteractiveElement, IntoElement, ParentElement, Pixels, RESIZE_DIVIDER_WIDTH,
+    RedistributableColumnsState, RegisterComponent, RenderOnce, ScrollAxes, ScrollableHandle,
+    Scrollbars, SharedString, StatefulInteractiveElement, Styled, StyledExt as _, StyledTypography,
+    TableResizeBehavior, Window, WithScrollbar, bind_redistributable_columns, div,
+    example_group_with_title, h_flex, px, render_column_resize_divider,
     render_redistributable_columns_resize_handles, single_example,
+    styles::semantic,
     table_row::{IntoTableRow as _, TableRow},
     v_flex,
 };
 use gpui::{
-    AbsoluteLength, DefiniteLength, DragMoveEvent, Entity, EntityId, FocusHandle, Length,
-    ListHorizontalSizingBehavior, ListSizingBehavior, ListState, Point, ScrollHandle, Stateful,
-    UniformListScrollHandle, WeakEntity, list, transparent_black, uniform_list,
+    AbsoluteLength, DefiniteLength, DragMoveEvent, Entity, EntityId, FocusHandle, FontWeight,
+    Length, ListHorizontalSizingBehavior, ListSizingBehavior, ListState, Point, ScrollHandle,
+    Stateful, UniformListScrollHandle, WeakEntity, list, transparent_black, uniform_list,
 };
 
 pub mod table_row;
@@ -532,8 +533,12 @@ pub fn render_table_row(
 ) -> AnyElement {
     let is_striped = table_context.striped;
     let is_last = row_index == table_context.total_row_count - 1;
-    let bg = if row_index % 2 == 1 && is_striped {
-        Some(cx.theme().colors().text.opacity(0.05))
+    let bg = if is_striped {
+        if row_index % 2 == 1 {
+            Some(semantic::elevated_surface(cx))
+        } else {
+            Some(semantic::surface(cx))
+        }
     } else {
         None
     };
@@ -553,12 +558,12 @@ pub fn render_table_row(
         .size_full()
         .when_some(bg, |row, bg| row.bg(bg))
         .when(table_context.show_row_hover, |row| {
-            row.hover(|s| s.bg(cx.theme().colors().element_hover.opacity(0.6)))
+            row.hover(|s| s.bg(semantic::hover_bg(cx)))
         })
         .when(!is_striped && table_context.show_row_borders, |row| {
             row.border_b_1()
                 .border_color(transparent_black())
-                .when(!is_last, |row| row.border_color(cx.theme().colors().border))
+                .when(!is_last, |row| row.border_color(semantic::border_muted(cx)))
         });
 
     row = row.children(
@@ -576,8 +581,8 @@ pub fn render_table_row(
                         .child(cell)
                 } else {
                     base_cell_style_text(width, table_context.use_ui_font, cx)
-                        .px_1()
-                        .py_0p5()
+                        .px_4()
+                        .py_3()
                         .child(cell)
                 }
             }),
@@ -617,8 +622,9 @@ pub fn render_table_header(
         .flex_row()
         .items_center()
         .w_full()
+        .bg(semantic::elevated_surface(cx))
         .border_b_1()
-        .border_color(cx.theme().colors().border)
+        .border_color(semantic::border_muted(cx))
         .children(
             headers
                 .into_vec()
@@ -627,8 +633,9 @@ pub fn render_table_header(
                 .zip(column_widths.into_vec())
                 .map(|((header_idx, h), width)| {
                     base_cell_style_text(width, table_context.use_ui_font, cx)
-                        .px_1()
-                        .py_0p5()
+                        .px_4()
+                        .py_3()
+                        .font_weight(FontWeight::SEMIBOLD)
                         .child(h)
                         .id(ElementId::NamedInteger(
                             shared_element_id.clone(),

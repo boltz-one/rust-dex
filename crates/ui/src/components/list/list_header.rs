@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{Disclosure, prelude::*};
 use component::{Component, ComponentScope, example_group_with_title, single_example};
-use gpui::{AnyElement, ClickEvent};
+use gpui::{AnyElement, ClickEvent, FontWeight};
 use theme::UiDensity;
 
 #[derive(IntoElement, RegisterComponent)]
@@ -94,9 +94,7 @@ impl RenderOnce for ListHeader {
                         _ => this.h_7(),
                     })
                     .when(self.inset, |this| this.px_2())
-                    .when(self.selected, |this| {
-                        this.bg(cx.theme().colors().ghost_element_selected)
-                    })
+                    .when(self.selected, |this| this.bg(semantic::active_bg(cx)))
                     .flex()
                     .flex_1()
                     .items_center()
@@ -117,7 +115,12 @@ impl RenderOnce for ListHeader {
                                     .gap(DynamicSpacing::Base04.rems(cx))
                                     .items_center()
                                     .children(self.start_slot)
-                                    .child(Label::new(self.label.clone()).color(Color::Muted))
+                                    .child(
+                                        Label::new(self.label.clone())
+                                            .size(LabelSize::Small)
+                                            .weight(FontWeight::MEDIUM)
+                                            .color(Color::Muted),
+                                    )
                                     .when_some(self.on_toggle, |this, on_toggle| {
                                         this.on_click(move |event, window, cx| {
                                             on_toggle(event, window, cx)

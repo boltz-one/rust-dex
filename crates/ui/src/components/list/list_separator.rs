@@ -9,6 +9,6 @@ impl RenderOnce for ListSeparator {
             .h_px()
             .w_full()
             .my(DynamicSpacing::Base06.rems(cx))
-            .bg(cx.theme().colors().border_variant)
+            .bg(semantic::border_muted(cx))
     }
 }
