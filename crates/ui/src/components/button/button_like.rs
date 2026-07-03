@@ -2,7 +2,7 @@ use documented::Documented;
 use gpui::{
     AnyElement, AnyView, ClickEvent, CursorStyle, DefiniteLength, FocusHandle, Hsla, MouseButton,
     MouseClickEvent, MouseDownEvent, MouseUpEvent, Rems, StyleRefinement, relative,
-    transparent_black,
+    transparent_black, white,
 };
 use smallvec::SmallVec;
 
@@ -69,32 +69,38 @@ pub enum TintColor {
 }
 
 impl TintColor {
-    fn button_like_style(self, cx: &mut App) -> ButtonLikeStyles {
+    /// Solid Tailwind-style background for the enabled/default state.
+    fn solid_bg(self) -> Hsla {
         match self {
-            TintColor::Accent => ButtonLikeStyles {
-                background: cx.theme().status().info_background,
-                border_color: cx.theme().status().info_border,
-                label_color: cx.theme().colors().text,
-                icon_color: cx.theme().colors().text,
-            },
-            TintColor::Error => ButtonLikeStyles {
-                background: cx.theme().status().error_background,
-                border_color: cx.theme().status().error_border,
-                label_color: cx.theme().colors().text,
-                icon_color: cx.theme().colors().text,
-            },
-            TintColor::Warning => ButtonLikeStyles {
-                background: cx.theme().status().warning_background,
-                border_color: cx.theme().status().warning_border,
-                label_color: cx.theme().colors().text,
-                icon_color: cx.theme().colors().text,
-            },
-            TintColor::Success => ButtonLikeStyles {
-                background: cx.theme().status().success_background,
-                border_color: cx.theme().status().success_border,
-                label_color: cx.theme().colors().text,
-                icon_color: cx.theme().colors().text,
-            },
+            TintColor::Accent => palette::primary(600),
+            TintColor::Error => palette::danger(600),
+            TintColor::Warning => palette::warning(600),
+            TintColor::Success => palette::success(600),
+        }
+    }
+
+    /// Darker solid background used on hover (Tailwind's `-700` shade).
+    fn solid_bg_hovered(self) -> Hsla {
+        match self {
+            TintColor::Accent => palette::primary(700),
+            TintColor::Error => palette::danger(700),
+            TintColor::Warning => palette::warning(700),
+            TintColor::Success => palette::success(700),
+        }
+    }
+
+    /// Non-breaking remap: `Tinted` colors now render as solid Tailwind
+    /// accent/status buttons (white text on a `-600` background) instead of
+    /// the previous faint Zed `status()` tint. Enum variants are unchanged so
+    /// every existing caller (`icon_button`/`split_button`/`toggle_button`/
+    /// `copy_button`) keeps working without modification.
+    fn button_like_style(self, _cx: &mut App) -> ButtonLikeStyles {
+        let bg = self.solid_bg();
+        ButtonLikeStyles {
+            background: bg,
+            border_color: bg,
+            label_color: white(),
+            icon_color: white(),
         }
     }
 }
@@ -272,10 +278,13 @@ impl ButtonStyle {
                 }
             }
             ButtonStyle::Tinted(tint) => {
-                let mut styles = tint.button_like_style(cx);
-                let theme = cx.theme();
-                styles.background = theme.darken(styles.background, 0.05, 0.2);
-                styles
+                let bg = tint.solid_bg_hovered();
+                ButtonLikeStyles {
+                    background: bg,
+                    border_color: bg,
+                    label_color: white(),
+                    icon_color: white(),
+                }
             }
             ButtonStyle::Outlined => ButtonLikeStyles {
                 background: cx.theme().colors().ghost_element_hover,
@@ -320,7 +329,15 @@ impl ButtonStyle {
                 label_color: Color::Default.color(cx),
                 icon_color: Color::Default.color(cx),
             },
-            ButtonStyle::Tinted(tint) => tint.button_like_style(cx),
+            ButtonStyle::Tinted(tint) => {
+                let bg = tint.solid_bg_hovered();
+                ButtonLikeStyles {
+                    background: bg,
+                    border_color: bg,
+                    label_color: white(),
+                    icon_color: white(),
+                }
+            }
             ButtonStyle::Subtle => ButtonLikeStyles {
                 background: cx.theme().colors().ghost_element_active,
                 border_color: transparent_black(),
@@ -492,6 +509,10 @@ pub struct ButtonLike {
     tab_index: Option<isize>,
     size: ButtonSize,
     rounding: Option<ButtonLikeRounding>,
+    /// Additive override for the enabled-state background, used to render
+    /// treatments (e.g. Tailwind's "soft" button) that `ButtonStyle`'s enum
+    /// doesn't model directly, without introducing a new variant.
+    pub(super) background_override: Option<Hsla>,
     tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView>>,
     hoverable_tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView>>,
     cursor_style: CursorStyle,
@@ -514,6 +535,7 @@ impl ButtonLike {
             height: None,
             size: ButtonSize::Default,
             rounding: Some(ButtonLikeRounding::ALL),
+            background_override: None,
             tooltip: None,
             hoverable_tooltip: None,
             children: SmallVec::new(),
@@ -550,6 +572,12 @@ impl ButtonLike {
 
     pub(crate) fn rounding(mut self, rounding: impl Into<Option<ButtonLikeRounding>>) -> Self {
         self.rounding = rounding.into();
+        self
+    }
+
+    /// Overrides the enabled-state background color, regardless of `style`.
+    pub(crate) fn background_override(mut self, color: impl Into<Option<Hsla>>) -> Self {
+        self.background_override = color.into();
         self
     }
 
@@ -707,6 +735,7 @@ impl RenderOnce for ButtonLike {
             })
             .border_color(style.enabled(self.layer, cx).border_color)
             .bg(style.enabled(self.layer, cx).background)
+            .when_some(self.background_override, |this, color| this.bg(color))
             .when(self.disabled, |this| {
                 if self.cursor_style == CursorStyle::PointingHand {
                     this.cursor_not_allowed()
@@ -716,8 +745,15 @@ impl RenderOnce for ButtonLike {
             })
             .when(!self.disabled, |this| {
                 let hovered_style = style.hovered(self.layer, cx);
-                let focus_color =
-                    |refinement: StyleRefinement| refinement.bg(hovered_style.background);
+                // When a background override is set (e.g. `Button::soft()`),
+                // keep that color across hover/active too, so a label color
+                // tuned for the override doesn't collide with the style's
+                // solid hover/active background (which would hide the text).
+                let hover_bg = self.background_override.unwrap_or(hovered_style.background);
+                let active_bg = self
+                    .background_override
+                    .unwrap_or(style.active(cx).background);
+                let focus_color = move |refinement: StyleRefinement| refinement.bg(hover_bg);
 
                 this.cursor(self.cursor_style)
                     .hover(focus_color)
@@ -730,7 +766,7 @@ impl RenderOnce for ButtonLike {
                             this.focus_visible(focus_color)
                         }
                     })
-                    .active(|active| active.bg(style.active(cx).background))
+                    .active(move |active| active.bg(active_bg))
             })
             .when_some(
                 self.on_right_click.filter(|_| !self.disabled),

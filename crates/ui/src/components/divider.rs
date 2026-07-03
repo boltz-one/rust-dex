@@ -8,6 +8,7 @@ pub fn divider() -> Divider {
         direction: DividerDirection::Horizontal,
         color: DividerColor::default(),
         inset: false,
+        label: None,
     }
 }
 
@@ -17,6 +18,7 @@ pub fn vertical_divider() -> Divider {
         direction: DividerDirection::Vertical,
         color: DividerColor::default(),
         inset: false,
+        label: None,
     }
 }
 
@@ -44,9 +46,9 @@ pub enum DividerColor {
 impl DividerColor {
     pub fn hsla(self, cx: &mut App) -> Hsla {
         match self {
-            DividerColor::Border => cx.theme().colors().border,
-            DividerColor::BorderFaded => cx.theme().colors().border.opacity(0.6),
-            DividerColor::BorderVariant => cx.theme().colors().border_variant,
+            DividerColor::Border => semantic::border(cx),
+            DividerColor::BorderFaded => semantic::border(cx).opacity(0.6),
+            DividerColor::BorderVariant => semantic::border_muted(cx),
         }
     }
 }
@@ -57,6 +59,7 @@ pub struct Divider {
     direction: DividerDirection,
     color: DividerColor,
     inset: bool,
+    label: Option<SharedString>,
 }
 
 impl Divider {
@@ -66,6 +69,7 @@ impl Divider {
             direction: DividerDirection::Horizontal,
             color: DividerColor::default(),
             inset: false,
+            label: None,
         }
     }
 
@@ -75,6 +79,7 @@ impl Divider {
             direction: DividerDirection::Vertical,
             color: DividerColor::default(),
             inset: false,
+            label: None,
         }
     }
 
@@ -84,6 +89,7 @@ impl Divider {
             direction: DividerDirection::Horizontal,
             color: DividerColor::default(),
             inset: false,
+            label: None,
         }
     }
 
@@ -93,6 +99,7 @@ impl Divider {
             direction: DividerDirection::Vertical,
             color: DividerColor::default(),
             inset: false,
+            label: None,
         }
     }
 
@@ -103,6 +110,13 @@ impl Divider {
 
     pub fn color(mut self, color: DividerColor) -> Self {
         self.color = color;
+        self
+    }
+
+    /// Renders a label centered on the divider line, with the line
+    /// continuing on both sides. Only supported for horizontal dividers.
+    pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
         self
     }
 
@@ -143,6 +157,24 @@ impl Divider {
 
 impl RenderOnce for Divider {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        if self.direction == DividerDirection::Horizontal {
+            if let Some(label) = self.label.clone() {
+                let line_color = self.color.hsla(cx);
+                return h_flex()
+                    .w_full()
+                    .items_center()
+                    .gap_2()
+                    .child(div().h_px().flex_1().bg(line_color))
+                    .child(
+                        Label::new(label)
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    )
+                    .child(div().h_px().flex_1().bg(line_color))
+                    .into_any_element();
+            }
+        }
+
         let base = match self.direction {
             DividerDirection::Horizontal => div()
                 .min_w_0()
@@ -197,6 +229,10 @@ impl Component for Divider {
                                 "Dashed",
                                 Divider::horizontal_dashed().into_any_element(),
                             ),
+                            single_example(
+                                "Labeled",
+                                Divider::horizontal().label("OR").into_any_element(),
+                            ),
                         ],
                     ),
                     example_group_with_title(
@@ -242,6 +278,7 @@ impl Component for Divider {
                                 .child(Label::new("Section Two"))
                                 .child(Divider::horizontal_dashed())
                                 .child(Label::new("Section Three"))
+                                .child(Divider::horizontal().label("End"))
                                 .into_any_element(),
                         )],
                     ),

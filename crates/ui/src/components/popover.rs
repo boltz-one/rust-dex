@@ -35,7 +35,7 @@ pub const POPOVER_Y_PADDING: Pixels = px(8.);
 ///
 /// Example: A theme select control. Displays "One Dark", clicking it opens a list of themes.
 /// When one is selected, the theme select control displays the selected theme.
-#[derive(IntoElement)]
+#[derive(IntoElement, RegisterComponent)]
 pub struct Popover {
     children: SmallVec<[AnyElement; 2]>,
     aside: Option<AnyElement>,
@@ -48,15 +48,22 @@ impl RenderOnce for Popover {
             .gap_1()
             .child(
                 v_flex()
-                    .elevation_2(cx)
+                    .bg(semantic::elevated_surface(cx))
+                    .border_1()
+                    .border_color(semantic::border(cx))
+                    .rounded_md()
+                    .shadow_level(Shadow::Lg)
                     .py(POPOVER_Y_PADDING / 2.)
                     .child(div().children(self.children)),
             )
             .when_some(self.aside, |this, aside| {
                 this.child(
                     v_flex()
-                        .elevation_2(cx)
-                        .bg(cx.theme().colors().surface_background)
+                        .bg(semantic::elevated_surface(cx))
+                        .border_1()
+                        .border_color(semantic::border(cx))
+                        .rounded_md()
+                        .shadow_level(Shadow::Lg)
                         .px_1()
                         .child(aside),
                 )
@@ -90,5 +97,27 @@ impl Popover {
 impl ParentElement for Popover {
     fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
         self.children.extend(elements)
+    }
+}
+
+impl Component for Popover {
+    fn scope() -> ComponentScope {
+        ComponentScope::Overlays
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("A raised surface for displaying contextual content, styled like the dropdown family.")
+    }
+
+    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
+        Some(
+            example_group(vec![single_example(
+                "Basic",
+                Popover::new()
+                    .child(div().p_2().child(Label::new("Popover content")))
+                    .into_any_element(),
+            )])
+            .into_any_element(),
+        )
     }
 }

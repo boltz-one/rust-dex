@@ -1,6 +1,8 @@
-use gpui::{AnyElement, App, Context, Entity, Render, Window};
+use gpui::{Context, Entity, Render, Window};
 use theme::{Appearance, SystemAppearance};
 use ui::prelude::*;
+
+use crate::pages;
 
 /// Component groups shown in the gallery sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -9,6 +11,9 @@ pub enum GalleryPage {
     Forms,
     Feedback,
     Navigation,
+    Data,
+    Overlays,
+    Layout,
 }
 
 impl GalleryPage {
@@ -18,24 +23,43 @@ impl GalleryPage {
             GalleryPage::Forms => "Forms",
             GalleryPage::Feedback => "Feedback",
             GalleryPage::Navigation => "Navigation",
+            GalleryPage::Data => "Data",
+            GalleryPage::Overlays => "Overlays",
+            GalleryPage::Layout => "Layout",
         }
     }
 }
 
-const PAGES: [GalleryPage; 4] = [
+const PAGES: [GalleryPage; 7] = [
     GalleryPage::Elements,
     GalleryPage::Forms,
     GalleryPage::Feedback,
     GalleryPage::Navigation,
+    GalleryPage::Data,
+    GalleryPage::Overlays,
+    GalleryPage::Layout,
 ];
+
+/// A single toast entry owned by the gallery (mirrors `ToastStack`'s
+/// caller-owns-the-list contract), driving the Overlays page's "Show toast" /
+/// dismiss demo with real state instead of a static mock.
+pub(crate) struct ToastItem {
+    pub(crate) id: u64,
+    pub(crate) severity: Severity,
+    pub(crate) heading: SharedString,
+    pub(crate) description: SharedString,
+}
 
 /// The root gallery view: a sidebar of component groups plus a content area
 /// showing the selected group's showcase.
 pub struct GalleryApp {
-    page: GalleryPage,
-    text_input: Entity<TextInput>,
-    textarea: Entity<TextInput>,
-    select: Entity<Select>,
+    pub(crate) page: GalleryPage,
+    pub(crate) text_input: Entity<TextInput>,
+    pub(crate) textarea: Entity<TextInput>,
+    pub(crate) select: Entity<Select>,
+    pub(crate) modal_open: bool,
+    pub(crate) toasts: Vec<ToastItem>,
+    pub(crate) next_toast_id: u64,
 }
 
 impl GalleryApp {
@@ -49,78 +73,10 @@ impl GalleryApp {
                     .placeholder("Your message…")
             }),
             select: cx.new(|_| Select::new(["Low", "Medium", "High"]).placeholder("Priority")),
+            modal_open: false,
+            toasts: Vec::new(),
+            next_toast_id: 0,
         }
-    }
-
-    fn render_forms(&self) -> AnyElement {
-        v_flex()
-            .gap_6()
-            .w(px(360.))
-            .child(field("Email", self.text_input.clone().into_any_element()))
-            .child(field("Message", self.textarea.clone().into_any_element()))
-            .child(field("Priority", self.select.clone().into_any_element()))
-            .child(field(
-                "Plan",
-                v_flex()
-                    .gap_2()
-                    .child(RadioButton::new("plan-free").label("Free").checked(true))
-                    .child(RadioButton::new("plan-pro").label("Pro"))
-                    .into_any_element(),
-            ))
-            .child(field(
-                "Preferences",
-                v_flex()
-                    .gap_2()
-                    .child(Checkbox::new("chk-updates", ToggleState::Selected))
-                    .child(Checkbox::new("chk-marketing", ToggleState::Unselected))
-                    .into_any_element(),
-            ))
-            .child(field(
-                "Notifications",
-                h_flex()
-                    .gap_3()
-                    .child(Switch::new("sw-on", ToggleState::Selected))
-                    .child(Switch::new("sw-off", ToggleState::Unselected))
-                    .into_any_element(),
-            ))
-            .into_any_element()
-    }
-}
-
-fn field(label: &str, control: AnyElement) -> AnyElement {
-    v_flex()
-        .gap_1()
-        .child(Label::new(label.to_string()).size(LabelSize::Small))
-        .child(control)
-        .into_any_element()
-}
-
-fn section(title: &str, body: Option<AnyElement>) -> AnyElement {
-    v_flex()
-        .gap_3()
-        .child(Label::new(title.to_string()).size(LabelSize::Large))
-        .children(body)
-        .into_any_element()
-}
-
-fn render_static_page(page: GalleryPage, window: &mut Window, cx: &mut App) -> AnyElement {
-    match page {
-        GalleryPage::Elements => v_flex()
-            .gap_8()
-            .child(section("Buttons", Button::preview(window, cx)))
-            .child(section("Badges", Badge::preview(window, cx)))
-            .child(section("Cards", Card::preview(window, cx)))
-            .into_any_element(),
-        GalleryPage::Feedback => v_flex()
-            .gap_8()
-            .child(section("Alerts", Alert::preview(window, cx)))
-            .into_any_element(),
-        GalleryPage::Navigation => v_flex()
-            .gap_8()
-            .child(section("Navbar", Navbar::preview(window, cx)))
-            .child(section("Sidebar", Sidebar::preview(window, cx)))
-            .into_any_element(),
-        GalleryPage::Forms => div().into_any_element(),
     }
 }
 
@@ -141,10 +97,14 @@ impl Render for GalleryApp {
             );
         }
 
-        let content = if current == GalleryPage::Forms {
-            self.render_forms()
-        } else {
-            render_static_page(current, window, cx)
+        let content = match current {
+            GalleryPage::Elements => pages::elements::render(window, cx),
+            GalleryPage::Forms => self.render_forms(window, cx),
+            GalleryPage::Feedback => pages::feedback::render(window, cx),
+            GalleryPage::Navigation => pages::navigation::render(window, cx),
+            GalleryPage::Data => pages::data::render(window, cx),
+            GalleryPage::Overlays => self.render_overlays(window, cx),
+            GalleryPage::Layout => pages::layout::render(window, cx),
         };
 
         h_flex()

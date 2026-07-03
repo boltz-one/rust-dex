@@ -207,6 +207,9 @@ impl RenderOnce for IconButton {
             self.selected_style.unwrap().into()
         } else if is_selected {
             self.selected_icon_color.unwrap_or(Color::Selected)
+        } else if matches!(self.base.style, ButtonStyle::Tinted(_)) {
+            // Solid Tinted backgrounds need a light icon for contrast.
+            Color::Custom(gpui::white().opacity(self.alpha.unwrap_or(1.0)))
         } else {
             let base_color = self.icon_color.color(cx);
             Color::Custom(base_color.opacity(self.alpha.unwrap_or(1.0)))

@@ -1,11 +1,30 @@
 use crate::{ListBulletItem, prelude::*};
 use component::{Component, ComponentScope, example_group, single_example};
-use gpui::{AnyElement, ClickEvent, IntoElement, ParentElement, SharedString};
+use gpui::{AnyElement, ClickEvent, Hsla, IntoElement, ParentElement, SharedString};
 use smallvec::SmallVec;
+
+fn role(severity: Severity, step: u16) -> Hsla {
+    match severity {
+        Severity::Info => palette::primary(step),
+        Severity::Success => palette::success(step),
+        Severity::Warning => palette::warning(step),
+        Severity::Error => palette::danger(step),
+    }
+}
+
+fn icon_for(severity: Severity) -> IconName {
+    match severity {
+        Severity::Info => IconName::Info,
+        Severity::Success => IconName::CheckCircle,
+        Severity::Warning => IconName::ExclamationTriangle,
+        Severity::Error => IconName::XCircle,
+    }
+}
 
 #[derive(IntoElement, RegisterComponent)]
 pub struct AnnouncementToast {
     illustration: Option<AnyElement>,
+    severity: Option<Severity>,
     heading: Option<SharedString>,
     description: Option<SharedString>,
     bullet_items: SmallVec<[AnyElement; 6]>,
@@ -20,6 +39,7 @@ impl AnnouncementToast {
     pub fn new() -> Self {
         Self {
             illustration: None,
+            severity: None,
             heading: None,
             description: None,
             bullet_items: SmallVec::new(),
@@ -33,6 +53,13 @@ impl AnnouncementToast {
 
     pub fn illustration(mut self, illustration: impl IntoElement) -> Self {
         self.illustration = Some(illustration.into_any_element());
+        self
+    }
+
+    /// Sets a role-colored severity icon shown next to the heading (ignored when
+    /// an [`Self::illustration`] is set).
+    pub fn severity(mut self, severity: Severity) -> Self {
+        self.severity = Some(severity);
         self
     }
 
@@ -100,26 +127,45 @@ impl RenderOnce for AnnouncementToast {
         let has_illustration = self.illustration.is_some();
         let illustration = self.illustration;
 
+        let severity = self.severity;
+
         v_flex()
             .id("announcement-toast")
             .occlude()
             .relative()
             .w_full()
-            .elevation_3(cx)
+            .max_w(px(384.))
+            .bg(semantic::elevated_surface(cx))
+            .border_1()
+            .border_color(semantic::border(cx))
+            .rounded_lg()
+            .shadow_level(Shadow::Lg)
             .when_some(illustration, |this, i| this.child(i))
             .child(
                 v_flex()
                     .p_4()
                     .gap_4()
                     .when(has_illustration, |s| {
-                        s.border_t_1()
-                            .border_color(cx.theme().colors().border_variant)
+                        s.border_t_1().border_color(semantic::border_muted(cx))
                     })
                     .child(
                         v_flex()
                             .min_w_0()
                             .when_some(self.heading, |this, heading| {
-                                this.child(Headline::new(heading).size(HeadlineSize::Small))
+                                this.child(
+                                    h_flex()
+                                        .gap_2()
+                                        .when(!has_illustration, |row| {
+                                            row.when_some(severity, |row, severity| {
+                                                row.child(
+                                                    Icon::new(icon_for(severity))
+                                                        .size(IconSize::Small)
+                                                        .color(Color::Custom(role(severity, 500))),
+                                                )
+                                            })
+                                        })
+                                        .child(Headline::new(heading).size(HeadlineSize::Small)),
+                                )
                             })
                             .when_some(self.description, |this, description| {
                                 this.child(Label::new(description).color(Color::Muted))
@@ -133,7 +179,7 @@ impl RenderOnce for AnnouncementToast {
                             .gap_1()
                             .child(
                                 Button::new("try-now", self.primary_action_label)
-                                    .style(ButtonStyle::Tinted(crate::TintColor::Accent))
+                                    .primary()
                                     .full_width()
                                     .on_click(self.primary_on_click),
                             )
@@ -147,7 +193,7 @@ impl RenderOnce for AnnouncementToast {
             )
             .child(
                 div().absolute().top_1().right_1().child(
-                    IconButton::new("dismiss", IconName::Close)
+                    IconButton::new("dismiss", IconName::XMark)
                         .icon_size(IconSize::Small)
                         .on_click(self.dismiss_on_click),
                 ),
@@ -165,28 +211,46 @@ impl Component for AnnouncementToast {
     }
 
     fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
-        let examples = vec![single_example(
-            "Basic",
-            div()
-                .w_80()
-                .child(
-                    AnnouncementToast::new()
-                        .heading("Introducing Parallel Agents")
-                        .description("Run multiple agent threads simultaneously across projects.")
-                        .bullet_item(ListBulletItem::new(
-                            "Mix and match the app's agent with any ACP-compatible agent",
-                        ))
-                        .bullet_item(ListBulletItem::new(
-                            "Optional worktree isolation keeps agents from conflicting",
-                        ))
-                        .bullet_item(ListBulletItem::new(
-                            "Updated workspace layout designed for agentic workflows",
-                        ))
-                        .primary_action_label("Try Now")
-                        .secondary_action_label("Learn More"),
-                )
-                .into_any_element(),
-        )];
+        let examples = vec![
+            single_example(
+                "Basic",
+                div()
+                    .w_80()
+                    .child(
+                        AnnouncementToast::new()
+                            .heading("Introducing Parallel Agents")
+                            .description(
+                                "Run multiple agent threads simultaneously across projects.",
+                            )
+                            .bullet_item(ListBulletItem::new(
+                                "Mix and match the app's agent with any ACP-compatible agent",
+                            ))
+                            .bullet_item(ListBulletItem::new(
+                                "Optional worktree isolation keeps agents from conflicting",
+                            ))
+                            .bullet_item(ListBulletItem::new(
+                                "Updated workspace layout designed for agentic workflows",
+                            ))
+                            .primary_action_label("Try Now")
+                            .secondary_action_label("Learn More"),
+                    )
+                    .into_any_element(),
+            ),
+            single_example(
+                "With Severity",
+                div()
+                    .w_80()
+                    .child(
+                        AnnouncementToast::new()
+                            .severity(Severity::Success)
+                            .heading("Changes saved")
+                            .description("Your workspace settings were updated successfully.")
+                            .primary_action_label("Dismiss")
+                            .secondary_action_label("View Details"),
+                    )
+                    .into_any_element(),
+            ),
+        ];
 
         Some(
             v_flex()

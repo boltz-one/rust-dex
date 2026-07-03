@@ -23,6 +23,7 @@ pub struct AlertModal {
     key_context: Option<String>,
     action_handlers: Vec<ActionHandler>,
     focus_handle: Option<FocusHandle>,
+    destructive: bool,
 }
 
 impl AlertModal {
@@ -39,6 +40,7 @@ impl AlertModal {
             key_context: None,
             action_handlers: Vec::new(),
             focus_handle: None,
+            destructive: false,
         }
     }
 
@@ -90,12 +92,21 @@ impl AlertModal {
         self.focus_handle = Some(focus_handle.clone());
         self
     }
+
+    /// Marks the primary action as destructive, rendering it with the danger button style
+    /// instead of the default primary style.
+    pub fn destructive(mut self, destructive: bool) -> Self {
+        self.destructive = destructive;
+        self
+    }
 }
 
 impl RenderOnce for AlertModal {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let width = self.width.unwrap_or_else(|| px(440.).into());
         let has_default_footer = self.primary_action.is_some() || self.dismiss_label.is_some();
+
+        let destructive = self.destructive;
 
         let mut modal = v_flex()
             .when_some(self.key_context, |this, key_context| {
@@ -105,9 +116,12 @@ impl RenderOnce for AlertModal {
                 this.track_focus(&focus_handle)
             })
             .id(self.id)
-            .elevation_3(cx)
             .w(width)
-            .bg(cx.theme().colors().elevated_surface_background)
+            .bg(semantic::elevated_surface(cx))
+            .border_1()
+            .border_color(semantic::border(cx))
+            .rounded_lg()
+            .shadow_level(Shadow::Xl)
             .overflow_hidden();
 
         for handler in self.action_handlers {
@@ -149,9 +163,18 @@ impl RenderOnce for AlertModal {
                     .p_3()
                     .items_center()
                     .justify_end()
-                    .gap_1()
+                    .gap(DynamicSpacing::Base12.rems(cx))
+                    .border_t_1()
+                    .border_color(semantic::border_muted(cx))
                     .child(Button::new(dismiss_label.clone(), dismiss_label).color(Color::Muted))
-                    .child(Button::new(primary_action.clone(), primary_action)),
+                    .child({
+                        let primary = Button::new(primary_action.clone(), primary_action);
+                        if destructive {
+                            primary.danger()
+                        } else {
+                            primary.primary()
+                        }
+                    }),
             );
         }
 
@@ -193,6 +216,16 @@ impl Component for AlertModal {
                             )
                             .primary_action("Leave Call")
                             .dismiss_label("Cancel")
+                            .into_any_element(),
+                    )]),
+                    example_group(vec![single_example(
+                        "Destructive Confirm",
+                        AlertModal::new("destructive-modal")
+                            .title("Delete this project?")
+                            .child("This action cannot be undone.")
+                            .primary_action("Delete")
+                            .dismiss_label("Cancel")
+                            .destructive(true)
                             .into_any_element(),
                     )]),
                     example_group(vec![single_example(

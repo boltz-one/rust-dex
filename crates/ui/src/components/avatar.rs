@@ -78,27 +78,34 @@ impl RenderOnce for Avatar {
             px(0.)
         };
 
-        let image_size = self.size.unwrap_or_else(|| rems(1.).into());
+        // Default to a 32px avatar (within the Tailwind 24-64px size range).
+        let image_size = self.size.unwrap_or_else(|| px(32.).into());
         let container_size = image_size.to_pixels(window.rem_size()) + border_width * 2.;
+        let border_color = self.border_color.unwrap_or_else(|| semantic::border(cx));
+        let fallback_icon_color = semantic::icon_muted(cx);
+        // Theme-driven fallback bg (adapts to dark/light), not a fixed gray.
+        let fallback_bg = semantic::elevated_surface(cx);
 
         div()
             .size(container_size)
             .rounded_full()
-            .when_some(self.border_color, |this, color| {
-                this.border(border_width).border_color(color)
+            .when(self.border_color.is_some(), |this| {
+                this.border(border_width).border_color(border_color)
             })
             .child(
                 self.image
                     .size(image_size)
                     .rounded_full()
-                    .bg(cx.theme().colors().element_disabled)
-                    .with_fallback(|| {
+                    .bg(fallback_bg)
+                    .with_fallback(move || {
                         h_flex()
                             .size_full()
                             .justify_center()
+                            .rounded_full()
+                            .bg(fallback_bg)
                             .child(
-                                Icon::new(IconName::Person)
-                                    .color(Color::Muted)
+                                Icon::new(IconName::User)
+                                    .color(Color::Custom(fallback_icon_color))
                                     .size(IconSize::Small),
                             )
                             .into_any_element()
@@ -261,6 +268,46 @@ impl Component for Avatar {
                                 .into_any_element(),
                         ).description("Can be used to create visual space by setting the border color to match the background, which creates the appearance of a gap around the avatar."),
                     ]),
+                    example_group_with_title(
+                        "Sizes (24-64px)",
+                        vec![
+                            single_example(
+                                "24px",
+                                Avatar::new(example_avatar)
+                                    .size(px(24.))
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "32px",
+                                Avatar::new(example_avatar)
+                                    .size(px(32.))
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "48px",
+                                Avatar::new(example_avatar)
+                                    .size(px(48.))
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "64px",
+                                Avatar::new(example_avatar)
+                                    .size(px(64.))
+                                    .into_any_element(),
+                            ),
+                        ],
+                    ),
+                    example_group_with_title(
+                        "Fallback (broken image → icon)",
+                        vec![
+                            single_example(
+                                "Icon Fallback",
+                                Avatar::new("not-a-real-image-source")
+                                    .size(px(48.))
+                                    .into_any_element(),
+                            ).description("When the image source fails to load, falls back to a `IconName::User` glyph on a neutral background."),
+                        ],
+                    ),
                     example_group_with_title(
                         "Indicator Styles",
                         vec![

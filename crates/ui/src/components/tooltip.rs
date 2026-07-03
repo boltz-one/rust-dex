@@ -2,8 +2,8 @@ use std::borrow::Borrow;
 use std::rc::Rc;
 
 use crate::prelude::*;
-use crate::{Color, KeyBinding, Label, LabelSize, StyledExt, h_flex, v_flex};
-use gpui::{Action, AnyElement, AnyView, AppContext, FocusHandle, IntoElement, Render};
+use crate::{Color, KeyBinding, Label, LabelSize, h_flex, v_flex};
+use gpui::{Action, AnyElement, AnyView, AppContext, FocusHandle, IntoElement, Render, white};
 
 #[derive(RegisterComponent)]
 pub struct Tooltip {
@@ -223,10 +223,12 @@ where
     // padding to avoid tooltip appearing right below the mouse cursor
     div().pl_2().pt_2p5().child(
         v_flex()
-            .elevation_2(app)
+            .bg(palette::neutral(900))
+            .rounded_md()
+            .shadow_level(Shadow::Md)
             .font(ui_font)
             .text_ui(app)
-            .text_color(app.theme().colors().text)
+            .text_color(white())
             .py_1()
             .px_2()
             .map(|el| f(el, cx)),

@@ -4,7 +4,7 @@ use gpui::{prelude::FluentBuilder, *};
 use smallvec::SmallVec;
 use theme::ActiveTheme;
 
-#[derive(IntoElement)]
+#[derive(IntoElement, RegisterComponent)]
 pub struct Modal {
     id: ElementId,
     header: ModalHeader,
@@ -68,12 +68,18 @@ impl RenderOnce for Modal {
             .size_full()
             .flex_1()
             .overflow_hidden()
+            .bg(semantic::elevated_surface(cx))
+            .border_1()
+            .border_color(semantic::border(cx))
+            .rounded_lg()
+            .shadow_level(crate::styles::Shadow::Xl)
             .child(self.header)
             .child(
                 v_flex()
                     .id(self.container_id.clone())
                     .w_full()
                     .flex_1()
+                    .p(DynamicSpacing::Base24.rems(cx))
                     .gap(DynamicSpacing::Base08.rems(cx))
                     .when_some(
                         self.container_scroll_handler,
@@ -175,6 +181,8 @@ impl RenderOnce for ModalHeader {
             .pt(DynamicSpacing::Base08.rems(cx))
             .pb(DynamicSpacing::Base04.rems(cx))
             .gap(DynamicSpacing::Base08.rems(cx))
+            .border_b_1()
+            .border_color(semantic::border_muted(cx))
             .when(self.show_back_button, |this| {
                 this.child(
                     IconButton::new("back", IconName::ArrowLeft)
@@ -285,9 +293,9 @@ impl RenderOnce for ModalFooter {
             .p(DynamicSpacing::Base08.rems(cx))
             .flex_none()
             .justify_between()
-            .gap_1()
+            .gap(DynamicSpacing::Base12.rems(cx))
             .border_t_1()
-            .border_color(cx.theme().colors().border_variant)
+            .border_color(semantic::border_muted(cx))
             .child(div().when_some(self.start_slot, |this, start_slot| this.child(start_slot)))
             .child(div().when_some(self.end_slot, |this, end_slot| this.child(end_slot)))
     }
@@ -469,5 +477,52 @@ impl From<&'static str> for SectionHeader {
     fn from(val: &'static str) -> Self {
         let label: SharedString = val.into();
         SectionHeader::new(label)
+    }
+}
+
+impl component::Component for Modal {
+    fn scope() -> ComponentScope {
+        ComponentScope::Overlays
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("A dialog surface with header/body/footer sections, raised above the app content.")
+    }
+
+    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
+        Some(
+            v_flex()
+                .gap_6()
+                .child(example_group(vec![single_example(
+                    "Basic",
+                    div()
+                        .w(px(420.))
+                        .h(px(280.))
+                        .child(
+                            Modal::new("modal-preview", None)
+                                .header(
+                                    ModalHeader::new()
+                                        .headline("Modal title")
+                                        .show_dismiss_button(true),
+                                )
+                                .section(
+                                    Section::new()
+                                        .child(Label::new("Modal body content goes here.")),
+                                )
+                                .footer(
+                                    ModalFooter::new().end_slot(
+                                        h_flex()
+                                            .gap_2()
+                                            .child(
+                                                Button::new("cancel", "Cancel").color(Color::Muted),
+                                            )
+                                            .child(Button::new("confirm", "Confirm").primary()),
+                                    ),
+                                ),
+                        )
+                        .into_any_element(),
+                )]))
+                .into_any_element(),
+        )
     }
 }

@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod gallery_app;
+mod pages;
 
 use gallery_app::GalleryApp;
 use gpui::{

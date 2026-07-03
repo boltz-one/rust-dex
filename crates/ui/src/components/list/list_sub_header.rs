@@ -56,9 +56,7 @@ impl RenderOnce for ListSubHeader {
                 div()
                     .h_5()
                     .when(self.inset, |this| this.px_2())
-                    .when(self.selected, |this| {
-                        this.bg(cx.theme().colors().ghost_element_selected)
-                    })
+                    .when(self.selected, |this| this.bg(semantic::active_bg(cx)))
                     .flex()
                     .flex_1()
                     .w_full()

@@ -47,6 +47,20 @@ impl TextInput {
         &self.content
     }
 
+    /// Programmatically sets the text content (e.g. `SearchInput`/`Combobox`
+    /// setting the display text after a selection). Notifies for re-render.
+    pub fn set_text(&mut self, text: impl Into<String>, cx: &mut Context<Self>) {
+        self.content = text.into();
+        cx.notify();
+    }
+
+    /// Clears the text content (e.g. `SearchInput`'s clear button). Notifies
+    /// for re-render.
+    pub fn clear(&mut self, cx: &mut Context<Self>) {
+        self.content.clear();
+        cx.notify();
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let keystroke = &event.keystroke;
         // Ignore keyboard shortcuts (cmd/ctrl chords) — only capture text input.

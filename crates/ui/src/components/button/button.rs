@@ -194,6 +194,41 @@ impl Button {
         self.loading = loading;
         self
     }
+
+    /// Convenience for a Tailwind-style solid "primary" button: solid
+    /// `palette::primary(600)` background with white text.
+    ///
+    /// Equivalent to `.style(ButtonStyle::Tinted(TintColor::Accent))`.
+    pub fn primary(mut self) -> Self {
+        self.base = self.base.style(ButtonStyle::Tinted(TintColor::Accent));
+        self.label_color = Some(Color::Custom(gpui::white()));
+        self
+    }
+
+    /// Convenience for a Tailwind-style solid "danger" button: solid
+    /// `palette::danger(600)` background with white text.
+    ///
+    /// Equivalent to `.style(ButtonStyle::Tinted(TintColor::Error))`.
+    pub fn danger(mut self) -> Self {
+        self.base = self.base.style(ButtonStyle::Tinted(TintColor::Error));
+        self.label_color = Some(Color::Custom(gpui::white()));
+        self
+    }
+
+    /// Convenience for a Tailwind-style "soft" button: faint
+    /// `palette::primary(50)` background with `palette::primary(700)` text.
+    ///
+    /// Implemented as an additive background override on top of the
+    /// `Tinted(Accent)` style, so it does not require a new `ButtonStyle`
+    /// variant.
+    pub fn soft(mut self) -> Self {
+        self.base = self
+            .base
+            .style(ButtonStyle::Tinted(TintColor::Accent))
+            .background_override(palette::primary(50));
+        self.label_color = Some(Color::Custom(palette::primary(700)));
+        self
+    }
 }
 
 impl Toggleable for Button {
@@ -371,6 +406,7 @@ impl RenderOnce for Button {
     fn render(self, _window: &mut Window, cx: &mut App) -> ButtonLike {
         let is_disabled = self.base.disabled;
         let is_selected = self.base.selected;
+        let button_style = self.base.style;
 
         let label = self
             .selected_label
@@ -381,8 +417,15 @@ impl RenderOnce for Button {
             Color::Disabled
         } else if is_selected {
             self.selected_label_color.unwrap_or(Color::Selected)
+        } else if let Some(color) = self.label_color {
+            color
+        } else if matches!(button_style, ButtonStyle::Tinted(_)) {
+            // Solid Tinted backgrounds (primary/danger/etc.) need light text
+            // for contrast — applies to every `.style(Tinted(..))` caller, not
+            // just the `.primary()`/`.danger()` sugar.
+            Color::Custom(gpui::white())
         } else {
-            self.label_color.unwrap_or_default()
+            Color::default()
         };
 
         self.base.child(
@@ -401,6 +444,8 @@ impl RenderOnce for Button {
                     this.when_some(self.start_icon, |this, icon| {
                         this.child(if is_disabled {
                             icon.color(Color::Disabled)
+                        } else if matches!(button_style, ButtonStyle::Tinted(_)) {
+                            icon.color(Color::Custom(gpui::white()))
                         } else {
                             icon
                         })
@@ -482,6 +527,93 @@ impl Component for Button {
                                 "Transparent",
                                 Button::new("transparent", "Transparent")
                                     .style(ButtonStyle::Transparent)
+                                    .into_any_element(),
+                            ),
+                        ],
+                    ),
+                    example_group_with_title(
+                        "Primary / Danger / Soft",
+                        vec![
+                            single_example(
+                                "Primary",
+                                Button::new("primary", "Primary")
+                                    .primary()
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "Danger",
+                                Button::new("danger", "Danger").danger().into_any_element(),
+                            ),
+                            single_example(
+                                "Soft",
+                                Button::new("soft", "Soft").soft().into_any_element(),
+                            ),
+                        ],
+                    ),
+                    example_group_with_title(
+                        "Variant \u{d7} Size Matrix",
+                        vec![
+                            single_example(
+                                "Large",
+                                h_flex()
+                                    .gap_2()
+                                    .child(
+                                        Button::new("matrix_primary_lg", "Primary")
+                                            .primary()
+                                            .size(ButtonSize::Large),
+                                    )
+                                    .child(
+                                        Button::new("matrix_danger_lg", "Danger")
+                                            .danger()
+                                            .size(ButtonSize::Large),
+                                    )
+                                    .child(
+                                        Button::new("matrix_soft_lg", "Soft")
+                                            .soft()
+                                            .size(ButtonSize::Large),
+                                    )
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "Medium",
+                                h_flex()
+                                    .gap_2()
+                                    .child(
+                                        Button::new("matrix_primary_md", "Primary")
+                                            .primary()
+                                            .size(ButtonSize::Medium),
+                                    )
+                                    .child(
+                                        Button::new("matrix_danger_md", "Danger")
+                                            .danger()
+                                            .size(ButtonSize::Medium),
+                                    )
+                                    .child(
+                                        Button::new("matrix_soft_md", "Soft")
+                                            .soft()
+                                            .size(ButtonSize::Medium),
+                                    )
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "Compact",
+                                h_flex()
+                                    .gap_2()
+                                    .child(
+                                        Button::new("matrix_primary_cp", "Primary")
+                                            .primary()
+                                            .size(ButtonSize::Compact),
+                                    )
+                                    .child(
+                                        Button::new("matrix_danger_cp", "Danger")
+                                            .danger()
+                                            .size(ButtonSize::Compact),
+                                    )
+                                    .child(
+                                        Button::new("matrix_soft_cp", "Soft")
+                                            .soft()
+                                            .size(ButtonSize::Compact),
+                                    )
                                     .into_any_element(),
                             ),
                         ],
