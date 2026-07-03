@@ -142,7 +142,15 @@ impl Render for GalleryApp {
             GalleryPage::Examples => self.render_examples(window, cx),
         };
 
-        h_flex()
+        // NOTE: a plain flex-row (default `align-items: stretch`), NOT `h_flex()`
+        // — `h_flex()` bakes in `.items_center()`, which sizes the sidebar/content
+        // columns to their own content height and centers them, so the content
+        // column never fills the window and its inner `flex_1().overflow_y_scroll()`
+        // has nothing to overflow (scroll offset stayed pinned at 0). Stretching
+        // the columns to full height is what makes the content area actually scroll.
+        div()
+            .flex()
+            .flex_row()
             .size_full()
             .bg(semantic::background(cx))
             .text_color(semantic::text(cx))

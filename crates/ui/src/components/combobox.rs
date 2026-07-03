@@ -1,4 +1,8 @@
-use gpui::{AnyElement, Context, Entity, Render};
+use std::{cell::Cell, rc::Rc};
+
+use gpui::{
+    AnyElement, Bounds, Context, Entity, Pixels, Render, anchored, canvas, deferred, point,
+};
 
 use crate::TextInput;
 use crate::prelude::*;
@@ -15,6 +19,11 @@ pub struct Combobox {
     selected: Option<usize>,
     open: bool,
     input: Entity<TextInput>,
+    /// Real screen bounds of the trigger row, captured via an invisible
+    /// `canvas()` measurement child every render and read back on the
+    /// *next* render to position the floating option list. See
+    /// `Select::trigger_bounds` for the full rationale.
+    trigger_bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
 }
 
 impl Combobox {
@@ -29,6 +38,7 @@ impl Combobox {
             selected: None,
             open: false,
             input,
+            trigger_bounds: Rc::new(Cell::new(None)),
         }
     }
 
@@ -56,6 +66,10 @@ impl Render for Combobox {
 
         let trigger = h_flex()
             .id("combobox-trigger")
+            // Test-only (no-op in release builds, per `debug_selector`'s own
+            // doc comment): lets integration tests locate the trigger's real
+            // rendered pixel bounds via `VisualTestContext::debug_bounds`.
+            .debug_selector(|| "COMBOBOX-TRIGGER".into())
             .w_full()
             .items_center()
             .justify_between()
@@ -73,21 +87,40 @@ impl Render for Combobox {
             .child(
                 div()
                     .id("combobox-toggle")
+                    // Test-only (no-op in release builds): the actual click
+                    // target for opening/closing the list — narrower than
+                    // the whole trigger row (which is mostly the embedded
+                    // `TextInput`).
+                    .debug_selector(|| "COMBOBOX-TOGGLE".into())
                     .cursor_pointer()
                     .child(Icon::new(IconName::ChevronDown).size(IconSize::Small))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.open = !this.open;
                         cx.notify();
                     })),
-            );
+            )
+            .child({
+                let trigger_bounds = self.trigger_bounds.clone();
+                canvas(
+                    move |bounds, _window, _cx| trigger_bounds.set(Some(bounds)),
+                    |_bounds, _state, _window, _cx| {},
+                )
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+            });
+
+        let trigger_width = px(240.);
 
         v_flex()
-            .w(px(240.))
+            .w(trigger_width)
             .gap_1()
             .child(trigger)
             .when(open, |this| {
                 let hover = semantic::hover_bg(cx);
                 let mut list = v_flex()
+                    .w(trigger_width)
                     .p_1()
                     .rounded_md()
                     .bg(semantic::elevated_surface(cx))
@@ -126,7 +159,30 @@ impl Render for Combobox {
                             .child(Label::new(option)),
                     );
                 }
-                this.child(list)
+
+                // Float the list in a `deferred` overlay pass, anchored just
+                // below the trigger's real (previous-frame) bounds, instead
+                // of an inline flow child — so it never pushes sibling
+                // content down. Same idiom as `PopoverMenu`/`ContextMenu`
+                // (`crates/ui/src/components/popover_menu.rs`,
+                // `crates/ui/src/components/context_menu.rs`).
+                let mut anchor = anchored().snap_to_window_with_margin(px(8.));
+                if let Some(bounds) = self.trigger_bounds.get() {
+                    anchor = anchor.position(point(
+                        bounds.origin.x,
+                        bounds.origin.y + bounds.size.height + px(4.),
+                    ));
+                }
+                let floating_list = deferred(
+                    anchor.child(
+                        div()
+                            .occlude()
+                            .debug_selector(|| "COMBOBOX-LIST".into())
+                            .child(list),
+                    ),
+                )
+                .with_priority(1);
+                this.child(floating_list)
             })
     }
 }

@@ -1939,10 +1939,6 @@ impl Interactivity {
             let scroll_max = Point::from(padded_content_size - bounds.size)
                 .map(round_to_two_decimals)
                 .max(&Default::default());
-            eprintln!(
-                "TMPDEBUG clamp_scroll_position content_size={:?} bounds={:?} scroll_max={:?}",
-                self.content_size, bounds, scroll_max
-            );
             // Clamp scroll offset in case scroll max is smaller now (e.g., if children
             // were removed or the bounds became larger).
             let mut scroll_offset = scroll_offset.borrow_mut();

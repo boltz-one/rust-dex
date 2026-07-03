@@ -124,11 +124,14 @@ impl RenderOnce for TabBar {
             .children(self.children);
 
         let middle = match style {
+            // No `.overflow_x_hidden()` here: the inner `tabs_row` already owns
+            // its horizontal overflow via `.overflow_x_scroll()`, and an outer
+            // clip on this `relative` wrapper made the `Tab` children
+            // non-hit-testable (clicks at their real bounds silently no-op'd).
             TabBarStyle::Underline => div()
                 .relative()
                 .flex_1()
                 .h_full()
-                .overflow_x_hidden()
                 .child(
                     div()
                         .absolute()
