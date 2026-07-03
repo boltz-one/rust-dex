@@ -111,6 +111,13 @@ impl Component for FileInput {
                         .into_any_element(),
                 )
                 .child(
+                    FileInput::new("file-input-selected")
+                        .label("resume.pdf")
+                        .hint("245 KB — click to replace")
+                        .on_click(|_, _, _| {})
+                        .into_any_element(),
+                )
+                .child(
                     FileInput::new("file-input-disabled")
                         .disabled(true)
                         .into_any_element(),

@@ -3,7 +3,10 @@ use std::rc::Rc;
 
 use crate::prelude::*;
 use crate::{Color, KeyBinding, Label, LabelSize, h_flex, v_flex};
-use gpui::{Action, AnyElement, AnyView, AppContext, FocusHandle, IntoElement, Render, white};
+use gpui::{
+    Action, AnyElement, AnyView, AppContext, FocusHandle, IntoElement, KeybindingKeystroke,
+    Keystroke, Render, white,
+};
 
 #[derive(RegisterComponent)]
 pub struct Tooltip {
@@ -284,12 +287,47 @@ impl Component for Tooltip {
 
     fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
         Some(
-            example_group(vec![single_example(
-                "Text only",
-                Button::new("delete-example", "Delete")
-                    .tooltip(Tooltip::text("This is a tooltip!"))
-                    .into_any_element(),
-            )])
+            example_group(vec![
+                single_example(
+                    "Text only",
+                    Button::new("delete-example", "Delete")
+                        .tooltip(Tooltip::text("This is a tooltip!"))
+                        .into_any_element(),
+                ),
+                single_example(
+                    "With Meta",
+                    Button::new("archive-example", "Archive")
+                        .tooltip(move |_, cx| {
+                            Tooltip::with_meta(
+                                "Archive conversation",
+                                None,
+                                "Moves this to your archive; you can restore it later.",
+                                cx,
+                            )
+                        })
+                        .into_any_element(),
+                ),
+                single_example(
+                    "With Keybinding",
+                    Button::new("save-example", "Save")
+                        .tooltip(move |_, cx| {
+                            let key_binding = KeyBinding::from_keystrokes(
+                                vec![KeybindingKeystroke::from_keystroke(
+                                    Keystroke::parse("cmd-s").unwrap(),
+                                )]
+                                .into(),
+                                false,
+                            );
+                            cx.new(|_| Tooltip {
+                                title: SharedString::from("Save").into(),
+                                meta: None,
+                                key_binding: Some(key_binding),
+                            })
+                            .into()
+                        })
+                        .into_any_element(),
+                ),
+            ])
             .into_any_element(),
         )
     }

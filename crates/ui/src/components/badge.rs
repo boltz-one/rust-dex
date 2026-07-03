@@ -125,20 +125,50 @@ impl Component for Badge {
             ("Warning", BadgeColor::Warning),
             ("Danger", BadgeColor::Danger),
         ];
-        let row = |variant: BadgeVariant| {
+        let row = |variant: BadgeVariant, dot: bool| {
             let mut r = h_flex().gap_2();
             for (name, color) in colors {
-                r = r.child(Badge::new(name).variant(variant).color(color).dot(true));
+                r = r.child(Badge::new(name).variant(variant).color(color).dot(dot));
             }
             r
+        };
+        let status_row = || {
+            h_flex()
+                .gap_2()
+                .child(
+                    Badge::new("Active")
+                        .variant(BadgeVariant::Soft)
+                        .color(BadgeColor::Success)
+                        .dot(true),
+                )
+                .child(
+                    Badge::new("Pending")
+                        .variant(BadgeVariant::Soft)
+                        .color(BadgeColor::Warning)
+                        .dot(true),
+                )
+                .child(
+                    Badge::new("Failed")
+                        .variant(BadgeVariant::Solid)
+                        .color(BadgeColor::Danger),
+                )
+                .child(
+                    Badge::new("Draft")
+                        .variant(BadgeVariant::Outline)
+                        .color(BadgeColor::Neutral),
+                )
         };
 
         Some(
             v_flex()
                 .gap_3()
-                .child(row(BadgeVariant::Soft))
-                .child(row(BadgeVariant::Solid))
-                .child(row(BadgeVariant::Outline))
+                .child(row(BadgeVariant::Soft, true))
+                .child(row(BadgeVariant::Solid, true))
+                .child(row(BadgeVariant::Outline, true))
+                .child(row(BadgeVariant::Soft, false))
+                .child(row(BadgeVariant::Solid, false))
+                .child(row(BadgeVariant::Outline, false))
+                .child(status_row())
                 .into_any_element(),
         )
     }

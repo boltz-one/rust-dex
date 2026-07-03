@@ -65,9 +65,28 @@ impl Component for Navbar {
 
     fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
         Some(
-            Navbar::new()
-                .trailing(Badge::new("v1").color(BadgeColor::Primary))
-                .child(Label::new("Application"))
+            v_flex()
+                .gap_4()
+                .child(
+                    Navbar::new()
+                        .trailing(Badge::new("v1.4.2").color(BadgeColor::Primary))
+                        .child(Label::new("Application")),
+                )
+                .child(
+                    Navbar::new()
+                        .trailing(
+                            h_flex()
+                                .gap_2()
+                                .child(Button::new("navbar-search", "Search"))
+                                .child(Button::new("navbar-invite", "Invite").primary()),
+                        )
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .child(Icon::new(IconName::Folder).size(IconSize::Small))
+                                .child(Label::new("Acme Workspace")),
+                        ),
+                )
                 .into_any_element(),
         )
     }

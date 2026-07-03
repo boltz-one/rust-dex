@@ -56,8 +56,14 @@ impl Component for Sidebar {
     fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
         Some(
             Sidebar::new()
-                .child(SidebarItem::new("nav-home", "Home").active(true))
-                .child(SidebarItem::new("nav-settings", "Settings"))
+                .child(
+                    SidebarItem::new("nav-home", "Home")
+                        .icon(IconName::Box)
+                        .active(true),
+                )
+                .child(SidebarItem::new("nav-projects", "Projects").icon(IconName::Folder))
+                .child(SidebarItem::new("nav-team", "Team").icon(IconName::Person))
+                .child(SidebarItem::new("nav-settings", "Settings").icon(IconName::Settings))
                 .into_any_element(),
         )
     }

@@ -72,6 +72,16 @@ impl RenderOnce for SegmentedControl {
 
             let mut cell = h_flex()
                 .id((group_id.clone(), i.to_string()))
+                // Test-only (no-op in release builds, per `debug_selector`'s
+                // own doc comment): lets integration tests locate a segment's
+                // real rendered pixel bounds via `VisualTestContext::debug_bounds`
+                // and drive a genuine `simulate_click`, instead of calling
+                // `on_change` directly. Mirrors the existing `Tab`/`ContextMenu`
+                // precedent for this exact pattern.
+                .debug_selector({
+                    let group_id = group_id.clone();
+                    move || format!("SEGMENT-{}-{}", group_id, i)
+                })
                 .flex_1()
                 .justify_center()
                 .px_3()

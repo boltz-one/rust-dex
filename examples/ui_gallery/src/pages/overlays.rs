@@ -116,21 +116,45 @@ impl GalleryApp {
             })
             .collect::<Vec<_>>();
 
+        let spawn = |severity: Severity, heading: &'static str, description: &'static str| {
+            cx.listener(move |this: &mut GalleryApp, _: &ClickEvent, _, cx| {
+                let id = this.next_toast_id;
+                this.next_toast_id += 1;
+                this.toasts.push(ToastItem {
+                    id,
+                    severity,
+                    heading: heading.into(),
+                    description: description.into(),
+                });
+                cx.notify();
+            })
+        };
+
         v_flex()
             .gap_3()
-            .child(Button::new("add-toast", "Show toast").on_click(cx.listener(
-                |this, _: &ClickEvent, _, cx| {
-                    let id = this.next_toast_id;
-                    this.next_toast_id += 1;
-                    this.toasts.push(ToastItem {
-                        id,
-                        severity: Severity::Success,
-                        heading: "Saved".into(),
-                        description: "Your changes were saved.".into(),
-                    });
-                    cx.notify();
-                },
-            )))
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(
+                        Button::new("add-toast-success", "Show success").on_click(spawn(
+                            Severity::Success,
+                            "Saved",
+                            "Your changes were saved.",
+                        )),
+                    )
+                    .child(
+                        Button::new("add-toast-warning", "Show warning").on_click(spawn(
+                            Severity::Warning,
+                            "Storage almost full",
+                            "You're using 92% of your quota.",
+                        )),
+                    )
+                    .child(Button::new("add-toast-error", "Show error").on_click(spawn(
+                        Severity::Error,
+                        "Upload failed",
+                        "Check your connection and try again.",
+                    ))),
+            )
             .child(
                 div()
                     .relative()

@@ -64,15 +64,40 @@ impl Component for Container {
         Some("A fixed max-width wrapper that centers its content horizontally.")
     }
 
-    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
-        Some(
+    fn preview(_window: &mut Window, cx: &mut App) -> Option<AnyElement> {
+        let boxed = |label: &'static str| {
             div()
-                .w(px(600.))
-                .child(
+                .bg(semantic::surface(cx))
+                .border_1()
+                .border_color(semantic::border(cx))
+                .rounded_md()
+                .py_2()
+                .child(Label::new(label))
+        };
+        let frame = |content: AnyElement| {
+            div()
+                .border_1()
+                .border_dashed()
+                .border_color(semantic::border_muted(cx))
+                .child(content)
+        };
+
+        Some(
+            v_flex()
+                .gap_4()
+                .w(px(700.))
+                .child(frame(
                     Container::new()
                         .max_width(px(400.))
-                        .child(Label::new("Centered content at a fixed max-width")),
-                )
+                        .child(boxed("max_width(400px) — centered"))
+                        .into_any_element(),
+                ))
+                .child(frame(
+                    Container::new()
+                        .max_width(px(240.))
+                        .child(boxed("max_width(240px) — narrower"))
+                        .into_any_element(),
+                ))
                 .into_any_element(),
         )
     }

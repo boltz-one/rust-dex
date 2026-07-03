@@ -149,19 +149,33 @@ impl Component for Stepper {
     }
 
     fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
+        let steps = || {
+            [
+                StepperStep::new("Account"),
+                StepperStep::new("Profile"),
+                StepperStep::new("Confirm"),
+            ]
+        };
+
         Some(
             v_flex()
                 .gap_6()
                 .child(example_group_with_title(
-                    "Basic Usage",
-                    vec![single_example(
-                        "Second Step In Progress",
-                        Stepper::new(1)
-                            .step(StepperStep::new("Account"))
-                            .step(StepperStep::new("Profile"))
-                            .step(StepperStep::new("Confirm"))
-                            .into_any_element(),
-                    )],
+                    "Progress States",
+                    vec![
+                        single_example(
+                            "Not Started",
+                            Stepper::new(0).steps(steps()).into_any_element(),
+                        ),
+                        single_example(
+                            "Second Step In Progress",
+                            Stepper::new(1).steps(steps()).into_any_element(),
+                        ),
+                        single_example(
+                            "All Complete",
+                            Stepper::new(3).steps(steps()).into_any_element(),
+                        ),
+                    ],
                 ))
                 .into_any_element(),
         )

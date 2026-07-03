@@ -1,6 +1,7 @@
-use gpui::{Context, Entity, Render, Window};
+use gpui::{Context, Entity, Render, ScrollHandle, Window};
 use theme::{Appearance, SystemAppearance};
 use ui::prelude::*;
+use ui::{Combobox, MultiSelect, SearchInput};
 
 use crate::pages;
 
@@ -14,6 +15,7 @@ pub enum GalleryPage {
     Data,
     Overlays,
     Layout,
+    Examples,
 }
 
 impl GalleryPage {
@@ -26,11 +28,12 @@ impl GalleryPage {
             GalleryPage::Data => "Data",
             GalleryPage::Overlays => "Overlays",
             GalleryPage::Layout => "Layout",
+            GalleryPage::Examples => "Examples",
         }
     }
 }
 
-const PAGES: [GalleryPage; 7] = [
+pub(crate) const PAGES: [GalleryPage; 8] = [
     GalleryPage::Elements,
     GalleryPage::Forms,
     GalleryPage::Feedback,
@@ -38,6 +41,7 @@ const PAGES: [GalleryPage; 7] = [
     GalleryPage::Data,
     GalleryPage::Overlays,
     GalleryPage::Layout,
+    GalleryPage::Examples,
 ];
 
 /// A single toast entry owned by the gallery (mirrors `ToastStack`'s
@@ -60,6 +64,22 @@ pub struct GalleryApp {
     pub(crate) modal_open: bool,
     pub(crate) toasts: Vec<ToastItem>,
     pub(crate) next_toast_id: u64,
+    /// Scroll offset for the main content area; persisted across frames so
+    /// scrolling any page actually moves the viewport instead of resetting.
+    pub(crate) scroll: ScrollHandle,
+    /// Active segment index for the Forms page's `SegmentedControl` demo.
+    pub(crate) forms_segment: usize,
+    pub(crate) multi_select: Entity<MultiSelect>,
+    pub(crate) combobox: Entity<Combobox>,
+    pub(crate) search_input: Entity<SearchInput>,
+    /// Active status-filter segment for the Examples page's table+toolbar
+    /// demo (0 = All, 1 = Active, 2 = Archived).
+    pub(crate) examples_status_filter: usize,
+    /// Whether the Examples page's settings-form demo was last "saved" (vs.
+    /// cancelled/untouched); drives a visible Badge confirmation.
+    pub(crate) examples_settings_saved: bool,
+    /// Active tab index for the Navigation page's `TabBar`/`Tab` demo.
+    pub(crate) nav_tab: usize,
 }
 
 impl GalleryApp {
@@ -72,10 +92,24 @@ impl GalleryApp {
                     .multiline(true)
                     .placeholder("Your message…")
             }),
-            select: cx.new(|_| Select::new(["Low", "Medium", "High"]).placeholder("Priority")),
+            select: cx.new(|_| {
+                Select::new(["Low", "Medium", "High", "Urgent", "Critical"]).placeholder("Priority")
+            }),
             modal_open: false,
             toasts: Vec::new(),
             next_toast_id: 0,
+            scroll: ScrollHandle::new(),
+            forms_segment: 0,
+            multi_select: cx.new(|_| {
+                MultiSelect::new(["Design", "Engineering", "Marketing", "Sales", "Support"])
+                    .selected_indices([0, 2])
+            }),
+            combobox: cx
+                .new(|cx| Combobox::new(cx, ["Apple", "Banana", "Cherry", "Date", "Elderberry"])),
+            search_input: cx.new(|cx| SearchInput::new(cx, "Search…")),
+            examples_status_filter: 0,
+            examples_settings_saved: false,
+            nav_tab: 0,
         }
     }
 }
@@ -101,10 +135,11 @@ impl Render for GalleryApp {
             GalleryPage::Elements => pages::elements::render(window, cx),
             GalleryPage::Forms => self.render_forms(window, cx),
             GalleryPage::Feedback => pages::feedback::render(window, cx),
-            GalleryPage::Navigation => pages::navigation::render(window, cx),
+            GalleryPage::Navigation => self.render_navigation(window, cx),
             GalleryPage::Data => pages::data::render(window, cx),
             GalleryPage::Overlays => self.render_overlays(window, cx),
             GalleryPage::Layout => pages::layout::render(window, cx),
+            GalleryPage::Examples => self.render_examples(window, cx),
         };
 
         h_flex()
@@ -138,7 +173,16 @@ impl Render for GalleryApp {
                             )
                             .child(Label::new(current.title().to_string())),
                     )
-                    .child(v_flex().flex_1().p_6().gap_8().child(content)),
+                    .child(
+                        v_flex()
+                            .id("gallery-content")
+                            .flex_1()
+                            .p_6()
+                            .gap_8()
+                            .overflow_y_scroll()
+                            .track_scroll(&self.scroll)
+                            .child(content),
+                    ),
             )
     }
 }

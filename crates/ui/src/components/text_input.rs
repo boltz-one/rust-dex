@@ -1,6 +1,17 @@
-use gpui::{Context, FocusHandle, KeyDownEvent, Render};
+use gpui::{Context, FocusHandle, Focusable, KeyDownEvent, MouseButton, Render};
 
 use crate::prelude::*;
+
+/// Visual validation state of a [`TextInput`], reflected in its border/focus
+/// ring color.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum InputValidationState {
+    #[default]
+    Neutral,
+    Error,
+    Success,
+    Warning,
+}
 
 /// A focusable single-line (or multi-line) text field backed by a real
 /// `String` buffer. Keyboard input is handled via key events (`key_char` +
@@ -13,7 +24,7 @@ pub struct TextInput {
     placeholder: SharedString,
     focus_handle: FocusHandle,
     multiline: bool,
-    invalid: bool,
+    validation: InputValidationState,
 }
 
 impl TextInput {
@@ -23,7 +34,7 @@ impl TextInput {
             placeholder: SharedString::default(),
             focus_handle: cx.focus_handle(),
             multiline: false,
-            invalid: false,
+            validation: InputValidationState::Neutral,
         }
     }
 
@@ -37,8 +48,36 @@ impl TextInput {
         self
     }
 
+    /// Sets the error validation state (red border/ring) when `invalid` is
+    /// true, otherwise clears back to [`InputValidationState::Neutral`].
     pub fn invalid(mut self, invalid: bool) -> Self {
-        self.invalid = invalid;
+        self.validation = if invalid {
+            InputValidationState::Error
+        } else {
+            InputValidationState::Neutral
+        };
+        self
+    }
+
+    /// Sets the success validation state (green border/ring) when `success`
+    /// is true, otherwise clears back to [`InputValidationState::Neutral`].
+    pub fn success(mut self, success: bool) -> Self {
+        self.validation = if success {
+            InputValidationState::Success
+        } else {
+            InputValidationState::Neutral
+        };
+        self
+    }
+
+    /// Sets the warning validation state (amber border/ring) when `warning`
+    /// is true, otherwise clears back to [`InputValidationState::Neutral`].
+    pub fn warning(mut self, warning: bool) -> Self {
+        self.validation = if warning {
+            InputValidationState::Warning
+        } else {
+            InputValidationState::Neutral
+        };
         self
     }
 
@@ -97,20 +136,29 @@ impl Render for TextInput {
         } else {
             semantic::text(cx)
         };
-        let border_color = if self.invalid {
-            palette::danger(500)
-        } else {
-            semantic::border(cx)
+        let border_color = match self.validation {
+            InputValidationState::Error => palette::danger(500),
+            InputValidationState::Success => palette::success(500),
+            InputValidationState::Warning => palette::warning(500),
+            InputValidationState::Neutral => semantic::border(cx),
         };
-        let ring_color = if self.invalid {
-            palette::danger(500)
-        } else {
-            palette::primary(500)
+        let ring_color = match self.validation {
+            InputValidationState::Error => palette::danger(500),
+            InputValidationState::Success => palette::success(500),
+            InputValidationState::Warning => palette::warning(500),
+            InputValidationState::Neutral => palette::primary(500),
         };
 
         let field = div()
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _event, window, cx| {
+                    window.focus(&this.focus_handle, cx);
+                    cx.notify();
+                }),
+            )
             .w_full()
             .when(self.multiline, |this| this.min_h(px(96.)))
             .flex()
@@ -130,6 +178,12 @@ impl Render for TextInput {
             });
 
         focus_ring(field, focused, ring_color)
+    }
+}
+
+impl Focusable for TextInput {
+    fn focus_handle(&self, _cx: &App) -> FocusHandle {
+        self.focus_handle.clone()
     }
 }
 

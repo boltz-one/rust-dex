@@ -3,12 +3,12 @@ use std::{ops::Range, rc::Rc};
 use crate::{
     AnyElement, App, Button, ButtonCommon as _, ButtonStyle, Color, Component, ComponentScope,
     Context, Div, DraggedColumn, ElementId, FixedWidth as _, FluentBuilder as _, HeaderResizeInfo,
-    Indicator, InteractiveElement, IntoElement, ParentElement, Pixels, RESIZE_DIVIDER_WIDTH,
-    RedistributableColumnsState, RegisterComponent, RenderOnce, ScrollAxes, ScrollableHandle,
-    Scrollbars, SharedString, StatefulInteractiveElement, Styled, StyledExt as _, StyledTypography,
-    TableResizeBehavior, Window, WithScrollbar, bind_redistributable_columns, div,
-    example_group_with_title, h_flex, px, render_column_resize_divider,
-    render_redistributable_columns_resize_handles, single_example,
+    Icon, IconName, IconSize, Indicator, InteractiveElement, IntoElement, Pagination,
+    ParentElement, Pixels, RESIZE_DIVIDER_WIDTH, RedistributableColumnsState, RegisterComponent,
+    RenderOnce, ScrollAxes, ScrollableHandle, Scrollbars, SharedString, StatefulInteractiveElement,
+    Styled, StyledExt as _, StyledTypography, TableResizeBehavior, Window, WithScrollbar,
+    bind_redistributable_columns, div, example_group_with_title, h_flex, px,
+    render_column_resize_divider, render_redistributable_columns_resize_handles, single_example,
     styles::semantic,
     table_row::{IntoTableRow as _, TableRow},
     v_flex,
@@ -330,6 +330,13 @@ impl ColumnWidthConfig {
     }
 }
 
+/// Sort direction shown by a [`Table`] sortable column header indicator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortDirection {
+    Ascending,
+    Descending,
+}
+
 /// A table component
 #[derive(RegisterComponent, IntoElement)]
 pub struct Table {
@@ -463,6 +470,61 @@ impl Table {
     pub fn header(mut self, headers: UncheckedTableRow<impl IntoElement>) -> Self {
         self.headers = Some(
             headers
+                .into_table_row(self.cols)
+                .map(IntoElement::into_any_element),
+        );
+        self
+    }
+
+    /// Renders a header row where every column is clickable and shows a sort
+    /// direction indicator (chevron up/down/up-down icon), calling `on_sort`
+    /// with the clicked column index.
+    ///
+    /// `sort_column` (if set) marks which column currently drives the sort
+    /// and is rendered with a direction-specific chevron
+    /// ([`SortDirection::Ascending`]/[`SortDirection::Descending`]); all
+    /// other columns show a neutral up/down chevron. This is purely additive
+    /// to [`Table::header`] — existing callers that use `.header(...)` are
+    /// unaffected.
+    pub fn sortable_header(
+        mut self,
+        headers: UncheckedTableRow<impl Into<SharedString>>,
+        sort_column: Option<usize>,
+        direction: SortDirection,
+        on_sort: impl Fn(usize, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        let on_sort = Rc::new(on_sort);
+        let cells: Vec<AnyElement> = headers
+            .into_iter()
+            .enumerate()
+            .map(|(column, label)| {
+                let is_active = sort_column == Some(column);
+                let icon = if is_active {
+                    match direction {
+                        SortDirection::Ascending => IconName::ChevronUp,
+                        SortDirection::Descending => IconName::ChevronDown,
+                    }
+                } else {
+                    IconName::ChevronUpDown
+                };
+                let on_sort = on_sort.clone();
+                h_flex()
+                    .id(("table-sort-header", column as u64))
+                    .items_center()
+                    .gap_1()
+                    .cursor_pointer()
+                    .child(label.into())
+                    .child(Icon::new(icon).size(IconSize::XSmall).color(if is_active {
+                        Color::Default
+                    } else {
+                        Color::Muted
+                    }))
+                    .on_click(move |_, window, cx| on_sort(column, window, cx))
+                    .into_any_element()
+            })
+            .collect();
+        self.headers = Some(
+            cells
                 .into_table_row(self.cols)
                 .map(IntoElement::into_any_element),
         );
@@ -1088,6 +1150,57 @@ impl Component for Table {
                                         .full_width()
                                         .into_any_element(),
                                 ])
+                                .into_any_element(),
+                        )],
+                    ),
+                    example_group_with_title(
+                        "Sortable Header",
+                        vec![
+                            single_example(
+                                "Ascending",
+                                Table::new(3)
+                                    .width(px(400.))
+                                    .sortable_header(
+                                        vec!["Name", "Age", "City"],
+                                        Some(0),
+                                        SortDirection::Ascending,
+                                        |_column, _window, _cx| {},
+                                    )
+                                    .row(vec!["Alice", "28", "New York"])
+                                    .row(vec!["Bob", "32", "San Francisco"])
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "Descending",
+                                Table::new(3)
+                                    .width(px(400.))
+                                    .sortable_header(
+                                        vec!["Name", "Age", "City"],
+                                        Some(1),
+                                        SortDirection::Descending,
+                                        |_column, _window, _cx| {},
+                                    )
+                                    .row(vec!["Bob", "32", "San Francisco"])
+                                    .row(vec!["Alice", "28", "New York"])
+                                    .into_any_element(),
+                            ),
+                        ],
+                    ),
+                    example_group_with_title(
+                        "With Pagination Footer",
+                        vec![single_example(
+                            "Table + Pagination",
+                            v_flex()
+                                .gap_2()
+                                .child(
+                                    Table::new(3)
+                                        .width(px(400.))
+                                        .header(vec!["Product", "Price", "Stock"])
+                                        .row(vec!["Laptop", "$999", "In Stock"])
+                                        .row(vec!["Phone", "$599", "Low Stock"])
+                                        .row(vec!["Tablet", "$399", "Out of Stock"]),
+                                )
+                                .child(Pagination::new("table-pagination-preview", 2, 5))
                                 .into_any_element(),
                         )],
                     ),

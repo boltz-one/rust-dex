@@ -96,10 +96,45 @@ impl Component for RadioButton {
     fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
         Some(
             v_flex()
-                .gap_2()
-                .child(RadioButton::new("radio-a").label("Selected").checked(true))
-                .child(RadioButton::new("radio-b").label("Unselected"))
-                .child(RadioButton::new("radio-c").label("Disabled").disabled(true))
+                .gap_6()
+                .child(
+                    v_flex()
+                        .gap_2()
+                        .child(
+                            Label::new("States")
+                                .size(LabelSize::Small)
+                                .color(Color::Muted),
+                        )
+                        .child(RadioButton::new("radio-a").label("Selected").checked(true))
+                        .child(RadioButton::new("radio-b").label("Unselected"))
+                        .child(
+                            RadioButton::new("radio-c")
+                                .label("Disabled, unselected")
+                                .disabled(true),
+                        )
+                        .child(
+                            RadioButton::new("radio-d")
+                                .label("Disabled, selected")
+                                .checked(true)
+                                .disabled(true),
+                        ),
+                )
+                .child(
+                    v_flex()
+                        .gap_2()
+                        .child(
+                            Label::new("Shipping method")
+                                .size(LabelSize::Small)
+                                .color(Color::Muted),
+                        )
+                        .child(
+                            RadioButton::new("ship-standard")
+                                .label("Standard (5-7 days)")
+                                .checked(true),
+                        )
+                        .child(RadioButton::new("ship-express").label("Express (2-3 days)"))
+                        .child(RadioButton::new("ship-overnight").label("Overnight")),
+                )
                 .into_any_element(),
         )
     }

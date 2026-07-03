@@ -128,15 +128,34 @@ impl RenderOnce for ActionPanel {
                     .border_color(semantic::border(cx))
                     .when_some(on_cancel, |this, handler| {
                         this.child(
-                            Button::new("action-panel-cancel", cancel_label)
-                                .on_click(move |_, window, cx| handler(window, cx)),
+                            // Wrapping `div` only exists so integration tests can
+                            // locate the Cancel button's real rendered pixel bounds
+                            // via `VisualTestContext::debug_bounds` (test-only,
+                            // no-op in release builds — mirrors the `Tab`/
+                            // `ContextMenu` `debug_selector` precedent) and drive a
+                            // genuine `simulate_click`, instead of invoking
+                            // `on_cancel` directly. It does not intercept the click:
+                            // the inner `Button` still owns the only click handler.
+                            div()
+                                .id("action-panel-cancel-wrap")
+                                .debug_selector(|| "ACTION_PANEL-cancel".into())
+                                .child(
+                                    Button::new("action-panel-cancel", cancel_label)
+                                        .on_click(move |_, window, cx| handler(window, cx)),
+                                ),
                         )
                     })
                     .when_some(on_save, |this, handler| {
                         this.child(
-                            Button::new("action-panel-save", save_label)
-                                .primary()
-                                .on_click(move |_, window, cx| handler(window, cx)),
+                            // See the Cancel wrapper's comment above; same rationale.
+                            div()
+                                .id("action-panel-save-wrap")
+                                .debug_selector(|| "ACTION_PANEL-save".into())
+                                .child(
+                                    Button::new("action-panel-save", save_label)
+                                        .primary()
+                                        .on_click(move |_, window, cx| handler(window, cx)),
+                                ),
                         )
                     }),
             )

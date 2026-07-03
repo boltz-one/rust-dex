@@ -2,7 +2,7 @@ use component::{Component, ComponentScope, example_group_with_title, single_exam
 use gpui::AnyElement;
 use smallvec::SmallVec;
 
-use crate::{Label, ListHeader, ListItem, prelude::*};
+use crate::{Label, ListHeader, ListItem, ListItemSpacing, prelude::*};
 
 pub enum EmptyMessage {
     Text(SharedString),
@@ -109,33 +109,95 @@ impl Component for List {
         Some(
             v_flex()
                 .gap_6()
-                .children(vec![example_group_with_title(
-                    "Basic Lists",
-                    vec![
-                        single_example(
-                            "Simple List",
+                .children(vec![
+                    example_group_with_title(
+                        "Basic Lists",
+                        vec![
+                            single_example(
+                                "Simple List",
+                                List::new()
+                                    .child(ListItem::new("item1").child(Label::new("Item 1")))
+                                    .child(ListItem::new("item2").child(Label::new("Item 2")))
+                                    .child(ListItem::new("item3").child(Label::new("Item 3")))
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "With Header",
+                                List::new()
+                                    .header(ListHeader::new("Section Header"))
+                                    .child(ListItem::new("item1").child(Label::new("Item 1")))
+                                    .child(ListItem::new("item2").child(Label::new("Item 2")))
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "Empty List",
+                                List::new()
+                                    .empty_message("No items to display")
+                                    .into_any_element(),
+                            ),
+                        ],
+                    ),
+                    example_group_with_title(
+                        "With Icons + Selected State",
+                        vec![single_example(
+                            "Team Members",
                             List::new()
-                                .child(ListItem::new("item1").child(Label::new("Item 1")))
-                                .child(ListItem::new("item2").child(Label::new("Item 2")))
-                                .child(ListItem::new("item3").child(Label::new("Item 3")))
+                                .header(ListHeader::new("Team Members"))
+                                .child(
+                                    ListItem::new("member-ada")
+                                        .start_slot(Icon::new(IconName::Check))
+                                        .toggle_state(true)
+                                        .child(Label::new("Ada Lovelace")),
+                                )
+                                .child(
+                                    ListItem::new("member-grace")
+                                        .start_slot(Icon::new(IconName::File))
+                                        .child(Label::new("Grace Hopper")),
+                                )
+                                .child(
+                                    ListItem::new("member-alan")
+                                        .start_slot(Icon::new(IconName::File))
+                                        .child(Label::new("Alan Turing")),
+                                )
                                 .into_any_element(),
-                        ),
-                        single_example(
-                            "With Header",
-                            List::new()
-                                .header(ListHeader::new("Section Header"))
-                                .child(ListItem::new("item1").child(Label::new("Item 1")))
-                                .child(ListItem::new("item2").child(Label::new("Item 2")))
-                                .into_any_element(),
-                        ),
-                        single_example(
-                            "Empty List",
-                            List::new()
-                                .empty_message("No items to display")
-                                .into_any_element(),
-                        ),
-                    ],
-                )])
+                        )],
+                    ),
+                    example_group_with_title(
+                        "Density",
+                        vec![
+                            single_example(
+                                "Dense",
+                                List::new()
+                                    .child(
+                                        ListItem::new("dense-1")
+                                            .spacing(ListItemSpacing::Dense)
+                                            .child(Label::new("Invoice #1042")),
+                                    )
+                                    .child(
+                                        ListItem::new("dense-2")
+                                            .spacing(ListItemSpacing::Dense)
+                                            .child(Label::new("Invoice #1043")),
+                                    )
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "Sparse",
+                                List::new()
+                                    .child(
+                                        ListItem::new("sparse-1")
+                                            .spacing(ListItemSpacing::Sparse)
+                                            .child(Label::new("Invoice #1042")),
+                                    )
+                                    .child(
+                                        ListItem::new("sparse-2")
+                                            .spacing(ListItemSpacing::Sparse)
+                                            .child(Label::new("Invoice #1043")),
+                                    )
+                                    .into_any_element(),
+                            ),
+                        ],
+                    ),
+                ])
                 .into_any_element(),
         )
     }

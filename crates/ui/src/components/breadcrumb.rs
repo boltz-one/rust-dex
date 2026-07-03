@@ -120,14 +120,32 @@ impl Component for Breadcrumb {
                 .gap_6()
                 .child(example_group_with_title(
                     "Basic Usage",
-                    vec![single_example(
-                        "Default",
-                        Breadcrumb::new()
-                            .item(BreadcrumbItem::new("crumb-home", "Home"))
-                            .item(BreadcrumbItem::new("crumb-projects", "Projects"))
-                            .item(BreadcrumbItem::new("crumb-current", "Current Page"))
-                            .into_any_element(),
-                    )],
+                    vec![
+                        single_example(
+                            "Three Levels",
+                            Breadcrumb::new()
+                                .item(BreadcrumbItem::new("crumb-home", "Home"))
+                                .item(BreadcrumbItem::new("crumb-projects", "Projects"))
+                                .item(BreadcrumbItem::new("crumb-current", "Current Page"))
+                                .into_any_element(),
+                        ),
+                        single_example(
+                            "Deep Hierarchy",
+                            Breadcrumb::new()
+                                .item(BreadcrumbItem::new("crumb-org", "Acme Corp"))
+                                .item(BreadcrumbItem::new("crumb-team", "Engineering"))
+                                .item(BreadcrumbItem::new("crumb-repo", "rust-dex"))
+                                .item(BreadcrumbItem::new("crumb-file", "gallery_app.rs"))
+                                .into_any_element(),
+                        ),
+                        single_example(
+                            "Two Levels",
+                            Breadcrumb::new()
+                                .item(BreadcrumbItem::new("crumb-root", "Dashboard"))
+                                .item(BreadcrumbItem::new("crumb-leaf", "Settings"))
+                                .into_any_element(),
+                        ),
+                    ],
                 ))
                 .into_any_element(),
         )

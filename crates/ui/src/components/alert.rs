@@ -107,9 +107,14 @@ impl Component for Alert {
                 .gap_3()
                 .w(px(420.))
                 .child(Alert::info("Heads up").message("This is an informational alert."))
-                .child(Alert::success("Saved").message("Your changes were saved."))
+                .child(
+                    Alert::success("Saved").message("Your changes to \"Q3 Roadmap\" were saved."),
+                )
                 .child(Alert::warning("Careful").message("This action needs review."))
-                .child(Alert::error("Failed").message("Something went wrong."))
+                .child(
+                    Alert::error("Failed").message("Payment could not be processed. Please retry."),
+                )
+                .child(Alert::info("Maintenance scheduled for Sunday, 2 AM UTC."))
                 .into_any_element(),
         )
     }
