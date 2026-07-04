@@ -1,9 +1,11 @@
 [package]
-name = "gpui_linux"
+name = "boltz-gpui-linux"
+description = "Linux GPUI backend: wgpu rendering with Wayland/X11 windowing and freedesktop integration."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
 license = "Apache-2.0"
+repository.workspace = true
 
 [lints]
 workspace = true

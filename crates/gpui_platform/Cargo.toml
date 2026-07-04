@@ -1,9 +1,11 @@
 [package]
-name = "gpui_platform"
+name = "boltz-gpui-platform"
+description = "Platform facade selecting the right GPUI backend for the target OS."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
 license = "Apache-2.0"
+repository.workspace = true
 
 [lints]
 workspace = true

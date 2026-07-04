@@ -78,16 +78,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
-name = "app"
-version = "0.1.0"
-dependencies = [
- "boltz-gpui",
- "gpui_platform",
- "theme",
- "ui",
-]
-
-[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -621,11 +611,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "boltz-app"
+version = "0.1.0"
+dependencies = [
+ "boltz-gpui",
+ "boltz-gpui-platform",
+ "boltz-theme",
+ "boltz-ui",
+]
+
+[[package]]
 name = "boltz-collections"
 version = "0.1.0"
 dependencies = [
  "indexmap",
  "rustc-hash 2.1.2",
+]
+
+[[package]]
+name = "boltz-component"
+version = "0.1.0"
+dependencies = [
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-theme",
+ "documented",
+ "inventory",
+ "parking_lot",
+ "strum",
 ]
 
 [[package]]
@@ -635,6 +648,30 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "boltz-font-kit"
+version = "0.14.1"
+dependencies = [
+ "bitflags 2.13.0",
+ "byteorder",
+ "core-foundation",
+ "core-graphics",
+ "core-text",
+ "dirs",
+ "dwrote",
+ "float-ord",
+ "freetype",
+ "freetype-sys",
+ "lazy_static",
+ "libc",
+ "log",
+ "pathfinder_geometry",
+ "pathfinder_simd",
+ "walkdir",
+ "winapi",
+ "yeslogic-fontconfig-sys",
 ]
 
 [[package]]
@@ -718,6 +755,94 @@ dependencies = [
 ]
 
 [[package]]
+name = "boltz-gpui-linux"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "as-raw-xcb-connection",
+ "ashpd",
+ "bitflags 2.13.0",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-gpui-wgpu",
+ "boltz-http-client",
+ "boltz-util",
+ "bytemuck",
+ "calloop",
+ "calloop-wayland-source",
+ "filedescriptor",
+ "futures",
+ "image",
+ "itertools 0.14.0",
+ "libc",
+ "log",
+ "oo7",
+ "open",
+ "parking_lot",
+ "pathfinder_geometry",
+ "pollster",
+ "profiling",
+ "raw-window-handle",
+ "smallvec",
+ "smol",
+ "strum",
+ "swash",
+ "url",
+ "uuid",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-cursor",
+ "wayland-protocols",
+ "wayland-protocols-plasma",
+ "wayland-protocols-wlr",
+ "x11-clipboard",
+ "x11rb",
+ "xkbcommon",
+]
+
+[[package]]
+name = "boltz-gpui-macos"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-task",
+ "block",
+ "boltz-collections",
+ "boltz-font-kit",
+ "boltz-gpui",
+ "boltz-media",
+ "boltz-util",
+ "cbindgen",
+ "cocoa",
+ "core-foundation",
+ "core-foundation-sys",
+ "core-graphics",
+ "core-text",
+ "core-video",
+ "ctor",
+ "derive_more",
+ "dispatch2",
+ "etagere",
+ "foreign-types",
+ "futures",
+ "image",
+ "itertools 0.14.0",
+ "libc",
+ "log",
+ "mach2",
+ "metal",
+ "objc",
+ "objc2-app-kit",
+ "parking_lot",
+ "pathfinder_geometry",
+ "raw-window-handle",
+ "semver",
+ "smallvec",
+ "strum",
+ "uuid",
+]
+
+[[package]]
 name = "boltz-gpui-macros"
 version = "0.1.0"
 dependencies = [
@@ -725,6 +850,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "boltz-gpui-platform"
+version = "0.1.0"
+dependencies = [
+ "boltz-gpui",
+ "boltz-gpui-linux",
+ "boltz-gpui-macos",
+ "boltz-gpui-windows",
 ]
 
 [[package]]
@@ -742,6 +877,56 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "log",
+]
+
+[[package]]
+name = "boltz-gpui-wgpu"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-gpui-util",
+ "bytemuck",
+ "cosmic-text",
+ "etagere",
+ "itertools 0.14.0",
+ "js-sys",
+ "log",
+ "parking_lot",
+ "pollster",
+ "profiling",
+ "raw-window-handle",
+ "smallvec",
+ "swash",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "wgpu",
+]
+
+[[package]]
+name = "boltz-gpui-windows"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-util",
+ "etagere",
+ "futures",
+ "image",
+ "itertools 0.14.0",
+ "log",
+ "parking_lot",
+ "rand",
+ "raw-window-handle",
+ "smallvec",
+ "uuid",
+ "windows 0.61.3",
+ "windows-core 0.61.2",
+ "windows-numerics 0.2.0",
+ "windows-registry",
 ]
 
 [[package]]
@@ -768,6 +953,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "boltz-icons"
+version = "0.1.0"
+dependencies = [
+ "boltz-gpui",
+ "rust-embed",
+ "serde",
+ "strum",
+]
+
+[[package]]
 name = "boltz-logging"
 version = "0.1.0"
 dependencies = [
@@ -790,6 +985,13 @@ dependencies = [
  "foreign-types",
  "metal",
  "objc",
+]
+
+[[package]]
+name = "boltz-menu"
+version = "0.1.0"
+dependencies = [
+ "boltz-gpui",
 ]
 
 [[package]]
@@ -829,6 +1031,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "boltz-syntax-theme"
+version = "0.1.0"
+dependencies = [
+ "boltz-gpui",
+]
+
+[[package]]
+name = "boltz-theme"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "boltz-collections",
+ "boltz-gpui",
+ "boltz-refineable",
+ "boltz-syntax-theme",
+ "palette",
+ "parking_lot",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_json_lenient",
+ "strum",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "boltz-tracing-facade"
 version = "0.1.0"
 dependencies = [
@@ -843,6 +1072,38 @@ dependencies = [
 [[package]]
 name = "boltz-tracing-facade-macros"
 version = "0.1.0"
+
+[[package]]
+name = "boltz-ui"
+version = "0.1.1"
+dependencies = [
+ "boltz-component",
+ "boltz-gpui",
+ "boltz-gpui-macros",
+ "boltz-gpui-util",
+ "boltz-icons",
+ "boltz-menu",
+ "boltz-theme",
+ "boltz-ui-macros",
+ "chrono",
+ "documented",
+ "itertools 0.14.0",
+ "schemars",
+ "serde",
+ "smallvec",
+ "strum",
+ "windows 0.61.3",
+]
+
+[[package]]
+name = "boltz-ui-macros"
+version = "0.1.0"
+dependencies = [
+ "boltz-component",
+ "boltz-ui",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "boltz-util"
@@ -1164,19 +1425,6 @@ checksum = "1b60b5124979fccd9addd89d8b97a1d6eebb4950694520c75ddd722535ea443f"
 dependencies = [
  "nix 0.31.3",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "component"
-version = "0.1.0"
-dependencies = [
- "boltz-collections",
- "boltz-gpui",
- "documented",
- "inventory",
- "parking_lot",
- "strum",
- "theme",
 ]
 
 [[package]]
@@ -1898,30 +2146,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "font_kit"
-version = "0.14.1"
-dependencies = [
- "bitflags 2.13.0",
- "byteorder",
- "core-foundation",
- "core-graphics",
- "core-text",
- "dirs",
- "dwrote",
- "float-ord",
- "freetype",
- "freetype-sys",
- "lazy_static",
- "libc",
- "log",
- "pathfinder_geometry",
- "pathfinder_simd",
- "walkdir",
- "winapi",
- "yeslogic-fontconfig-sys",
-]
-
-[[package]]
 name = "fontconfig-parser"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2350,154 +2574,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpui_linux"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "as-raw-xcb-connection",
- "ashpd",
- "bitflags 2.13.0",
- "boltz-collections",
- "boltz-gpui",
- "boltz-http-client",
- "boltz-util",
- "bytemuck",
- "calloop",
- "calloop-wayland-source",
- "filedescriptor",
- "futures",
- "gpui_wgpu",
- "image",
- "itertools 0.14.0",
- "libc",
- "log",
- "oo7",
- "open",
- "parking_lot",
- "pathfinder_geometry",
- "pollster",
- "profiling",
- "raw-window-handle",
- "smallvec",
- "smol",
- "strum",
- "swash",
- "url",
- "uuid",
- "wayland-backend",
- "wayland-client",
- "wayland-cursor",
- "wayland-protocols",
- "wayland-protocols-plasma",
- "wayland-protocols-wlr",
- "x11-clipboard",
- "x11rb",
- "xkbcommon",
-]
-
-[[package]]
-name = "gpui_macos"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-task",
- "block",
- "boltz-collections",
- "boltz-gpui",
- "boltz-media",
- "boltz-util",
- "cbindgen",
- "cocoa",
- "core-foundation",
- "core-foundation-sys",
- "core-graphics",
- "core-text",
- "core-video",
- "ctor",
- "derive_more",
- "dispatch2",
- "etagere",
- "font_kit",
- "foreign-types",
- "futures",
- "image",
- "itertools 0.14.0",
- "libc",
- "log",
- "mach2",
- "metal",
- "objc",
- "objc2-app-kit",
- "parking_lot",
- "pathfinder_geometry",
- "raw-window-handle",
- "semver",
- "smallvec",
- "strum",
- "uuid",
-]
-
-[[package]]
-name = "gpui_platform"
-version = "0.1.0"
-dependencies = [
- "boltz-gpui",
- "gpui_linux",
- "gpui_macos",
- "gpui_windows",
-]
-
-[[package]]
-name = "gpui_wgpu"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "boltz-collections",
- "boltz-gpui",
- "boltz-gpui-util",
- "bytemuck",
- "cosmic-text",
- "etagere",
- "itertools 0.14.0",
- "js-sys",
- "log",
- "parking_lot",
- "pollster",
- "profiling",
- "raw-window-handle",
- "smallvec",
- "swash",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "wgpu",
-]
-
-[[package]]
-name = "gpui_windows"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "boltz-collections",
- "boltz-gpui",
- "boltz-util",
- "etagere",
- "futures",
- "image",
- "itertools 0.14.0",
- "log",
- "parking_lot",
- "rand",
- "raw-window-handle",
- "smallvec",
- "uuid",
- "windows 0.61.3",
- "windows-core 0.61.2",
- "windows-numerics 0.2.0",
- "windows-registry",
-]
-
-[[package]]
 name = "grid"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2672,16 +2748,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
-]
-
-[[package]]
-name = "icons"
-version = "0.1.0"
-dependencies = [
- "boltz-gpui",
- "rust-embed",
- "serde",
- "strum",
 ]
 
 [[package]]
@@ -3321,13 +3387,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "menu"
-version = "0.1.0"
-dependencies = [
- "boltz-gpui",
 ]
 
 [[package]]
@@ -5218,13 +5277,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "syntax_theme"
-version = "0.1.0"
-dependencies = [
- "boltz-gpui",
-]
-
-[[package]]
 name = "sys-locale"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5282,26 +5334,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "theme"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "boltz-collections",
- "boltz-gpui",
- "boltz-refineable",
- "palette",
- "parking_lot",
- "schemars",
- "serde",
- "serde_json",
- "serde_json_lenient",
- "strum",
- "syntax_theme",
- "thiserror 2.0.18",
- "uuid",
 ]
 
 [[package]]
@@ -5637,48 +5669,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "ui"
-version = "0.1.1"
-dependencies = [
- "boltz-gpui",
- "boltz-gpui-macros",
- "boltz-gpui-util",
- "chrono",
- "component",
- "documented",
- "icons",
- "itertools 0.14.0",
- "menu",
- "schemars",
- "serde",
- "smallvec",
- "strum",
- "theme",
- "ui_macros",
- "windows 0.61.3",
-]
-
-[[package]]
 name = "ui_gallery"
 version = "0.1.0"
 dependencies = [
+ "boltz-component",
  "boltz-gpui",
+ "boltz-gpui-platform",
+ "boltz-icons",
+ "boltz-theme",
+ "boltz-ui",
  "chrono",
- "component",
- "gpui_platform",
- "icons",
- "theme",
- "ui",
-]
-
-[[package]]
-name = "ui_macros"
-version = "0.1.0"
-dependencies = [
- "component",
- "quote",
- "syn",
- "ui",
 ]
 
 [[package]]

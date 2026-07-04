@@ -1,9 +1,10 @@
 [package]
-name = "font_kit"
+name = "boltz-font-kit"
 version = "0.14.1"
-edition = "2021"
 description = "A cross-platform font loading library"
-readme = "README.md"
+license = "Apache-2.0"
+repository.workspace = true
+edition = "2018"
 rust-version = "1.77"
 publish = true
 
