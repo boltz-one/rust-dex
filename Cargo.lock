@@ -1899,7 +1899,7 @@ dependencies = [
 
 [[package]]
 name = "font_kit"
-version = "0.14.1-zed"
+version = "0.14.1"
 dependencies = [
  "bitflags 2.13.0",
  "byteorder",
