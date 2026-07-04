@@ -1,5 +1,6 @@
 use gpui::{AnyElement, Context, Window};
 use ui::prelude::*;
+use ui::{Form, Slider};
 
 use crate::gallery_app::GalleryApp;
 
@@ -10,11 +11,13 @@ impl GalleryApp {
     /// checkbox/switch, wired to real entity state) plus Phase 3's
     /// InputGroup/SearchInput/Combobox/MultiSelect/SegmentedControl/
     /// FormField/ActionPanel/FileInput additions. SearchInput/Combobox/
-    /// MultiSelect/SegmentedControl are backed by state persisted on
-    /// `GalleryApp` (entities created once in `new()`, or a plain index
-    /// field) instead of the recreate-per-render `*_preview()` helpers, so
-    /// typed/selected/active state survives re-renders. Every control below
-    /// is wrapped in `FormField` to show the label/help/error pattern real
+    /// MultiSelect/SegmentedControl/InputOtp/Command are backed by state
+    /// persisted on `GalleryApp` (entities created once in `new()`, or a
+    /// plain index field) instead of the recreate-per-render `*_preview()`
+    /// helpers, so typed/selected/active/focused state survives re-renders.
+    /// `Command` reuses the same entity as the Overlays page demo (safe,
+    /// since only one page renders at a time). Every control below is
+    /// wrapped in `FormField` to show the label/help/error pattern real
     /// forms use.
     pub(crate) fn render_forms(
         &mut self,
@@ -161,6 +164,26 @@ impl GalleryApp {
             .child(section("Form Field", FormField::preview(window, cx)))
             .child(section("Action Panel", ActionPanel::preview(window, cx)))
             .child(section("File Input", FileInput::preview(window, cx)))
+            .child(section("Slider", Slider::preview(window, cx)))
+            .child(section(
+                "Input OTP",
+                Some(self.input_otp.clone().into_any_element()),
+            ))
+            .child(section("Form (validation)", Form::preview(window, cx)))
+            .child(section(
+                "Command",
+                Some(self.command.clone().into_any_element()),
+            ))
+            .child(section(
+                "Native Select",
+                Some(
+                    Label::new(
+                        "Skipped — web-only <select> wrapper; use Select or Combobox on desktop.",
+                    )
+                    .color(Color::Muted)
+                    .into_any_element(),
+                ),
+            ))
             .into_any_element()
     }
 }

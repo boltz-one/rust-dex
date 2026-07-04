@@ -229,6 +229,66 @@ impl Button {
         self.label_color = Some(Color::Custom(palette::primary(700)));
         self
     }
+
+    /// shadcn/ui variant alias (recommended vocabulary).
+    ///
+    /// Maps to existing [`ButtonStyle`] / convenience builders without
+    /// renaming legacy `.primary()` / `.danger()` / `.soft()` call sites.
+    /// For link-style buttons use [`ButtonLink`] instead.
+    pub fn variant(mut self, variant: ButtonVariant) -> Self {
+        match variant {
+            ButtonVariant::Default => self.primary(),
+            ButtonVariant::Destructive => self.danger(),
+            ButtonVariant::Outline => {
+                self.base = self.base.style(ButtonStyle::Outlined);
+                self.label_color = None;
+                self
+            }
+            ButtonVariant::Secondary => {
+                self.base = self.base.style(ButtonStyle::Filled);
+                self.label_color = None;
+                self
+            }
+            ButtonVariant::Ghost => {
+                self.base = self.base.style(ButtonStyle::Transparent);
+                self.label_color = None;
+                self
+            }
+        }
+    }
+
+    /// shadcn/ui size alias. Icon-only sizing uses [`IconButton`], not this API.
+    pub fn shadcn_size(mut self, size: ButtonSizeAlias) -> Self {
+        let mapped = match size {
+            ButtonSizeAlias::Sm => ButtonSize::Compact,
+            ButtonSizeAlias::Default => ButtonSize::Default,
+            ButtonSizeAlias::Lg => ButtonSize::Medium,
+            ButtonSizeAlias::Icon => ButtonSize::None,
+        };
+        self.base = self.base.size(mapped);
+        self
+    }
+}
+
+/// shadcn/ui button variants (additive alias over [`ButtonStyle`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ButtonVariant {
+    #[default]
+    Default,
+    Destructive,
+    Outline,
+    Secondary,
+    Ghost,
+}
+
+/// shadcn/ui button sizes (additive alias over [`ButtonSize`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ButtonSizeAlias {
+    Sm,
+    #[default]
+    Default,
+    Lg,
+    Icon,
 }
 
 impl Toggleable for Button {

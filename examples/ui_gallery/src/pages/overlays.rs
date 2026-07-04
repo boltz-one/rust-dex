@@ -1,8 +1,8 @@
 use gpui::{AnyElement, ClickEvent, Context, Window, black};
 use ui::prelude::*;
 use ui::{
-    AlertModal, AnnouncementToast, Drawer, DropdownMenu, Modal, ModalFooter, ModalHeader, Popover,
-    Section, Tooltip,
+    AlertDialog, AlertModal, AnnouncementToast, Drawer, DropdownMenu, HoverCard, Modal,
+    ModalFooter, ModalHeader, Popover, Section, Tooltip,
 };
 
 use crate::gallery_app::{GalleryApp, ToastItem};
@@ -15,7 +15,11 @@ impl GalleryApp {
     /// ToastStack get real entity-backed triggers (open/close, add/dismiss)
     /// per the phase brief; the rest are self-contained (DropdownMenu) or
     /// purely visual (AlertModal/Drawer/Popover/Tooltip) so their own
-    /// `preview()` is reused as-is.
+    /// `preview()` is reused as-is. Menubar, Command, and Sonner reuse the
+    /// `Entity`s owned by `GalleryApp` (see `command` / `sonner` /
+    /// `ensure_menubar`) instead of the recreate-per-render `::preview()`
+    /// helpers, so their open menu / typed query / queued toasts persist
+    /// across re-renders.
     pub(crate) fn render_overlays(
         &mut self,
         window: &mut Window,
@@ -30,6 +34,36 @@ impl GalleryApp {
             .child(section("Popover", Popover::preview(window, cx)))
             .child(section("Tooltip", Tooltip::preview(window, cx)))
             .child(section("Toast Stack", Some(self.render_toast_demo(cx))))
+            .child(section(
+                "Sonner",
+                Some(
+                    div()
+                        .relative()
+                        .w(px(480.))
+                        .h(px(320.))
+                        .overflow_hidden()
+                        .child(self.sonner.clone())
+                        .into_any_element(),
+                ),
+            ))
+            .child(section("Alert Dialog", AlertDialog::preview(window, cx)))
+            .child(section("Hover Card", HoverCard::preview(window, cx)))
+            .child(section(
+                "Menubar",
+                Some(self.ensure_menubar(window, cx).into_any_element()),
+            ))
+            .child(section(
+                "Command",
+                Some(self.command.clone().into_any_element()),
+            ))
+            .child(section(
+                "Toast (deprecated)",
+                Some(
+                    Label::new("Skipped — shadcn deprecated Radix Toast in favor of Sonner.")
+                        .color(Color::Muted)
+                        .into_any_element(),
+                ),
+            ))
             .into_any_element()
     }
 

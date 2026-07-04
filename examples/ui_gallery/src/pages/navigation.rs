@@ -1,6 +1,6 @@
 use gpui::{AnyElement, Context, Window};
 use ui::prelude::*;
-use ui::{Tab, TabBar, TabBarStyle};
+use ui::{Disclosure, Tab, TabBar, TabBarStyle};
 
 use crate::gallery_app::GalleryApp;
 
@@ -15,7 +15,10 @@ impl GalleryApp {
     /// Breadcrumb/Pagination/VerticalNav/Stepper additions, plus a real
     /// `TabBar`/`Tab` demo (underline + pills) wired to `self.nav_tab` so
     /// clicking a tab persists the active index across re-renders instead of
-    /// a static `::preview()` mock.
+    /// a static `::preview()` mock. Navigation Menu and Menubar reuse the
+    /// `Entity`s owned by `GalleryApp` (see `nav_menu` / `ensure_menubar`)
+    /// instead of the recreate-per-render `::preview()` helpers, so their
+    /// open submenu/dropdown state persists across re-renders.
     pub(crate) fn render_navigation(
         &mut self,
         window: &mut Window,
@@ -58,6 +61,16 @@ impl GalleryApp {
             .child(section("Pagination", Pagination::preview(window, cx)))
             .child(section("Vertical Nav", VerticalNav::preview(window, cx)))
             .child(section("Stepper", Stepper::preview(window, cx)))
+            .child(section(
+                "Navigation Menu",
+                Some(self.nav_menu.clone().into_any_element()),
+            ))
+            .child(section(
+                "Menubar",
+                Some(self.ensure_menubar(window, cx).into_any_element()),
+            ))
+            .child(section("Accordion", Disclosure::preview(window, cx)))
+            .child(section("Collapsible", Disclosure::preview(window, cx)))
             .child(section(
                 "Tabs",
                 Some(

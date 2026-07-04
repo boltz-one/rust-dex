@@ -73,3 +73,48 @@ pub fn icon(cx: &App) -> Hsla {
 pub fn icon_muted(cx: &App) -> Hsla {
     cx.theme().colors().icon_muted
 }
+
+/// shadcn `--secondary` background: always-visible neutral-solid surface.
+pub fn secondary_bg(cx: &App) -> Hsla {
+    cx.theme().colors().element_background
+}
+
+/// shadcn `--secondary-foreground` text on [`secondary_bg`].
+pub fn secondary_fg(cx: &App) -> Hsla {
+    cx.theme().colors().text
+}
+
+/// shadcn `--muted` background (companion to [`text_muted`]).
+pub fn muted_bg(cx: &App) -> Hsla {
+    cx.theme().colors().ghost_element_hover
+}
+
+/// shadcn `--accent` background: standalone accent chip, not hover-only.
+pub fn accent_bg(cx: &App) -> Hsla {
+    cx.theme().colors().element_selected
+}
+
+/// shadcn `--accent-foreground` text on [`accent_bg`].
+pub fn accent_fg(cx: &App) -> Hsla {
+    cx.theme().colors().text_accent
+}
+
+/// shadcn `--card` background (alias of [`surface`]).
+pub fn card(cx: &App) -> Hsla {
+    surface(cx)
+}
+
+/// shadcn `--popover` background (alias of [`elevated_surface`]).
+pub fn popover(cx: &App) -> Hsla {
+    elevated_surface(cx)
+}
+
+/// shadcn `--ring` focus ring color (alias of [`border_focused`]).
+pub fn ring(cx: &App) -> Hsla {
+    border_focused(cx)
+}
+
+/// shadcn `--input` border color (alias of [`border`] in this kit).
+pub fn input_border(cx: &App) -> Hsla {
+    border(cx)
+}

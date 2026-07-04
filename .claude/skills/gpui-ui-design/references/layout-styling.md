@@ -78,10 +78,14 @@ Align content: `content_normal/center/start/end/between/around/evenly/stretch`.
 Justify: `justify_start/end/center/between/around/evenly()`.
 
 ### Background / fill
-`bg(impl Into<Fill>)` — accepts `Hsla` or a `Fill` (gradient). Theme helpers: `cx.theme().colors().element_background`, etc. `bg_transparent()`.
+`bg(impl Into<Fill>)` — accepts `Hsla` or a `Fill` (gradient). Feed it a token, not a raw theme
+call or literal: `bg(semantic::surface(cx))` (neutral) or `bg(palette::primary(600))` (accent).
+`bg_transparent()`.
 
 ### Border
-Width: `border_0/1/2/4/8()`, per-side `border_t/b/l/r/b/x/y_N()`. Color: `border_color(Hsla)` (often `cx.theme().colors().border`). Style: `border_dashed()`, `border_solid()`.
+Width: `border_0/1/2/4/8()`, per-side `border_t/b/l/r/x/y_N()`. Color: `border_color(Hsla)` —
+use `semantic::border(cx)` / `semantic::border_muted(cx)` / `semantic::border_focused(cx)`, not a
+hardcoded `Hsla`. Style: `border_dashed()`, `border_solid()`.
 
 ### Rounded corners
 `rounded_none/sm/md/lg/xl/2xl/3xl/full()`, per-corner `rounded_t/b/l/r/tr/tl/br/bl_*()`. `rounded_full()` = pill.
@@ -104,7 +108,7 @@ Width: `border_0/1/2/4/8()`, per-side `border_t/b/l/r/b/x/y_N()`. Color: `border
 
 ```rust
 div()
-    .when(self.has_error, |this| this.border_color(cx.theme().status().error))
+    .when(self.has_error, |this| this.border_color(palette::danger(500)))
     .when_some(self.icon, |this, icon| this.child(icon))   // runs only if Some
     .when_some(self.count, |this, n| this.child(Label::new(format!("{n}"))))
     .when_else(is_loading,
@@ -131,15 +135,15 @@ use ui::prelude::*;
 
 v_flex()
     .size_full()
-    .bg(cx.theme().colors().element_background)
+    .bg(semantic::surface(cx))
     .border_1()
-    .border_color(cx.theme().colors().border)
+    .border_color(semantic::border(cx))
     .rounded_md()
     .overflow_hidden()
     // Header row
     .child(
         h_flex().w_full().px_4().py_3().gap_2().border_b_1()
-            .border_color(cx.theme().colors().border_variant)
+            .border_color(semantic::border_muted(cx))
             .child(Icon::new(IconName::Settings).size(IconSize::Small))
             .child(Label::new("Settings").weight(FontWeight::BOLD))
             .child(div().flex_1())  // spacer pushes the rest right
@@ -153,7 +157,7 @@ v_flex()
                 .child(ListItem::new("b").child(Label::new("Option B"))))
     )
     .when(self.has_footer, |this| this.child(
-        h_flex().p_3().border_t_1().border_color(cx.theme().colors().border_variant)
+        h_flex().p_3().border_t_1().border_color(semantic::border_muted(cx))
             .child(Button::new("save", "Save").full_width())
     ))
 ```

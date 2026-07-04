@@ -9,8 +9,9 @@ metadata:
 
 This project (`rust-destop` / "Boltz") is a vendored copy of Zed's UI stack. The UI lives in:
 - `crates/gpui` — the framework (elements, `div()`, `Styled`, entities, actions, `Window`/`App`/`Context`).
-- `crates/ui` — the component crate (`Button`, `Label`, `Icon`, `List`, `Modal`, `Tooltip`, `ContextMenu`, …). Re-exported via `ui::prelude::*`.
-- `crates/theme` — colors, typography, `ActiveTheme` (`cx.theme()`).
+- `crates/ui` — the component crate. Now a **full shadcn/Tailwind-parity kit** (~90 components: Button, Select, Combobox, Dialog, Drawer, Command, Calendar, DatePicker, Table, Tabs, Accordion, Chart, Slider, Sonner, …). Re-exported via `ui::prelude::*`.
+- `crates/ui/src/styles/` — the **design-token system**: `palette` (accent/status ramps), `semantic` (theme-driven neutrals), `shadow`, `focus_ring`, `radius`. Prefer these over raw colors (see step 5 + `references/design-system.md`).
+- `crates/theme` — colors, typography, `ActiveTheme` (`cx.theme()`) — the layer `semantic::*` reads under the hood.
 - `crates/icons` — `IconName` (~290 SVG icons).
 
 This skill teaches how to think in GPUI and use these components idiomatically. The reference files hold the verbatim API; this file holds the mental model.
@@ -35,8 +36,9 @@ When asked to build/draw/design a UI, work top-down:
 2. **Pick layout primitives.** Start from `v_flex()` / `h_flex()` (flex + direction, **no default gap** — you add `.gap_N()`). For grouped control rows use `h_group()`/`v_group()` (flex + a fixed gap by size). See **`references/layout-styling.md`**.
 3. **Reach for a component before raw `div()`.** The `ui` crate already has Button, Label, Icon, IconButton, Tooltip, List/ListItem, Modal, ContextMenu, DropdownMenu, Disclosure, Toggle/Switch/Checkbox, Banner, Callout, ProgressBar, Avatar, etc. Using them gives you theme-correct colors, a11y, focus, and hover for free. See **`references/components.md`** for the verbatim constructor + builder methods of every one.
 4. **Wire interactions** with `on_click`/`on_action` + `cx.listener`, mutate state, `cx.notify()`.
-5. **Use theme, not raw colors.** `cx.theme().colors().text`, `Color::Accent`, `Color::Error`, `Severity::Warning`. `Color` carries semantic meaning across themes — prefer it over `Hsla` literals. See **`references/components.md`** § Colors & Severity.
-6. **Build & check.** `cargo check -p <crate>` (the project uses `./script/clippy` for clippy, mirroring Zed). Never `unwrap()`; propagate with `?` or `.log_err()`.
+5. **Use design tokens, never raw colors.** Neutrals (surface/border/text/hover) → `semantic::*(cx)`; accents/status → `palette::role(step)` (e.g. `palette::primary(600)`, `palette::danger(600)`); shadows → `el.shadow_level(Shadow::Lg)`; focus → `focus_ring_primary(el, focused)`. Never hardcode `hsla(...)`/`0xRRGGBB`. (`Color::Accent`/`cx.theme().colors()` still work — the underlying layer.) Full rules + the 4 critical patterns → **`references/design-system.md`**.
+6. **Overlays float; stateful children persist.** A popup (dropdown/select/popover/menu) must float via `deferred(anchored()…occlude())`, never inline (it would push layout). A stateful child (`Entity<T>`) must be stored as a field and created ONCE (never `cx.new(...)` inside `render`/`preview` — that resets its state every frame). Both patterns + code → `references/design-system.md` §2–3.
+7. **Build & check.** `cargo check -p <crate>` + `cargo test -p ui` / `cargo test -p ui_gallery` (headless `#[gpui::test]` harness — see `references/design-system.md` §5). Never `unwrap()`; propagate with `?` or `.log_err()`.
 
 ## The one import you need
 
@@ -76,7 +78,8 @@ This compiles in this project. To see how a view is **bootstrapped into a window
 
 ## Reference files (read as needed)
 
-- **`references/components.md`** — The catalog. Constructor + key builders + one idiomatic example for every `ui` component (buttons, labels, icons, lists, modals, menus, toggles, indicators, progress, banner/callout, avatar/facepile, tooltip, keybinding). **Read this before writing any component code** — it has the exact signatures.
+- **`references/design-system.md`** — ⭐ **Read for any styling or new-component work.** The token system (`palette`/`semantic`/`shadow`/`focus_ring`/`radius`), the 4 critical patterns (floating overlays, storing stateful child entities, authoring a component à la `badge.rs`, headless `#[gpui::test]` testing), and the grouped catalog of all ~90 components mapped to their `ui_gallery` pages.
+- **`references/components.md`** — The base-component catalog. Constructor + key builders + one idiomatic example for the core `ui` components (buttons, labels, icons, lists, modals, menus, toggles, indicators, progress, banner/callout, avatar/facepile, tooltip, keybinding). Exact signatures for the older set; for the shadcn-parity additions read the component file's `preview()` + `design-system.md` §6.
 - **`references/layout-styling.md`** — `div()`/`h_flex`/`v_flex`/`h_group`/`v_group`, the Tailwind-style method families (padding/margin/size/gap/flex/align/justify/border/rounded/overflow/text), the rem ramp, and conditional builders (`.when`/`.when_some`/`.when_else`).
 - **`references/views-and-state.md`** — `Entity<T>`, `Render`, `cx.new`/`update`/`notify`, `cx.listener`, `EventEmitter`/`subscribe`, `Focusable`, actions (`actions!` + `on_action`), and a full real-world view template.
 - **`references/app-bootstrap.md`** — How `main.rs` initializes `gpui_platform::application()`, theme, and opens a window. Copy-paste ready.

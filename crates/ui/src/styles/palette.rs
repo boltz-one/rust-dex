@@ -1,5 +1,12 @@
 //! Role-based color palette for the design system.
 //!
+//! ## shadcn mapping
+//!
+//! shadcn's `--destructive` / `--destructive-foreground` map to [`danger`]
+//! (Tailwind `red` ramp). Use `danger(600)` for solid destructive backgrounds
+//! and `danger(700)` for hover; pair with white foreground text on filled
+//! destructive controls. Theme-aware neutrals use [`crate::styles::semantic`].
+//!
 //! Colors are organized by semantic ROLE (`neutral`, `primary`, `success`,
 //! `warning`, `danger`, `info`), never by brand color name. Each role is a
 //! `50..=950` shade ramp returning [`Hsla`].

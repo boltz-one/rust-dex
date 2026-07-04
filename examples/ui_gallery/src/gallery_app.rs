@@ -1,7 +1,11 @@
 use gpui::{Context, Entity, Render, ScrollHandle, Window};
 use theme::{Appearance, SystemAppearance};
 use ui::prelude::*;
-use ui::{Combobox, MultiSelect, SearchInput};
+use ui::{
+    Calendar, Carousel, Combobox, Command, CommandItem, ContextMenu, DatePicker, InputOtp, Menubar,
+    MultiSelect, NavigationMenu, NavigationMenuItemDef, NavigationMenuSubItem, ResizablePanelGroup,
+    SearchInput, SonnerStack,
+};
 
 use crate::pages;
 
@@ -80,6 +84,38 @@ pub struct GalleryApp {
     pub(crate) examples_settings_saved: bool,
     /// Active tab index for the Navigation page's `TabBar`/`Tab` demo.
     pub(crate) nav_tab: usize,
+    /// Command palette demo (Overlays page). Created once here — never in a
+    /// `preview()`/render body — so typed queries and selection persist.
+    pub(crate) command: Entity<Command>,
+    /// OTP input demo. Created once here so slot focus/typed digits persist
+    /// across re-renders (see `Forms` page usage of this component pattern).
+    pub(crate) input_otp: Entity<InputOtp>,
+    /// Calendar demo (Layout page) — created once so the selected day and
+    /// visible month persist across re-renders.
+    pub(crate) calendar: Entity<Calendar>,
+    /// Date picker demo (Layout page) — created once so open/closed state
+    /// and the picked date persist across re-renders.
+    pub(crate) date_picker: Entity<DatePicker>,
+    /// Carousel demo (Layout page) — created once so the active slide
+    /// persists across re-renders.
+    pub(crate) carousel: Entity<Carousel>,
+    /// Navigation menu demo (Navigation + Data pages) — created once so the
+    /// open submenu persists across re-renders.
+    pub(crate) nav_menu: Entity<NavigationMenu>,
+    /// Sonner-style toast queue demo (Overlays page) — created once so
+    /// queued/dismissed toasts persist across re-renders.
+    pub(crate) sonner: Entity<SonnerStack>,
+    /// Resizable split-panel demo (Layout + Data pages) — created once so
+    /// the dragged split fraction persists across re-renders.
+    pub(crate) resizable: Entity<ResizablePanelGroup>,
+    /// Menubar demo (Navigation + Overlays pages). Unlike the other entities
+    /// above, this can't be created in `new()`: its dropdown `ContextMenu`s
+    /// require `&mut Window` (via `ContextMenu::build`), and `GalleryApp::new`
+    /// only receives `&mut Context<Self>`. It is instead created lazily on
+    /// first render via `ensure_menubar` — the `Option` guard means it is
+    /// still only ever constructed once, not on every frame, which is what
+    /// actually fixes the recreate-per-render bug for this component.
+    pub(crate) menubar: Option<Entity<Menubar>>,
 }
 
 impl GalleryApp {
@@ -110,7 +146,141 @@ impl GalleryApp {
             examples_status_filter: 0,
             examples_settings_saved: false,
             nav_tab: 0,
+            command: cx.new(|cx| {
+                Command::new(
+                    cx,
+                    vec![
+                        CommandItem::Group("Suggestions".into()),
+                        CommandItem::Entry {
+                            id: "cal".into(),
+                            label: "Calendar".into(),
+                        },
+                        CommandItem::Entry {
+                            id: "sr".into(),
+                            label: "Search Emoji".into(),
+                        },
+                        CommandItem::Entry {
+                            id: "calc".into(),
+                            label: "Calculator".into(),
+                        },
+                        CommandItem::Group("Settings".into()),
+                        CommandItem::Entry {
+                            id: "prof".into(),
+                            label: "Profile".into(),
+                        },
+                        CommandItem::Entry {
+                            id: "bill".into(),
+                            label: "Billing".into(),
+                        },
+                    ],
+                )
+            }),
+            input_otp: cx.new(|cx| InputOtp::new(cx, 6)),
+            calendar: cx.new(|_| Calendar::new()),
+            date_picker: cx.new(DatePicker::new),
+            carousel: cx.new(|_| {
+                Carousel::new([
+                    ("Slide 1", palette::primary(100)),
+                    ("Slide 2", palette::success(100)),
+                    ("Slide 3", palette::warning(100)),
+                ])
+            }),
+            nav_menu: cx.new(|_| {
+                NavigationMenu::new(vec![
+                    NavigationMenuItemDef {
+                        label: "Getting Started".into(),
+                        items: vec![
+                            NavigationMenuSubItem {
+                                label: "Introduction".into(),
+                            },
+                            NavigationMenuSubItem {
+                                label: "Installation".into(),
+                            },
+                        ],
+                    },
+                    NavigationMenuItemDef {
+                        label: "Components".into(),
+                        items: vec![
+                            NavigationMenuSubItem {
+                                label: "Button".into(),
+                            },
+                            NavigationMenuSubItem {
+                                label: "Dialog".into(),
+                            },
+                            NavigationMenuSubItem {
+                                label: "Table".into(),
+                            },
+                        ],
+                    },
+                ])
+            }),
+            sonner: cx.new(SonnerStack::new),
+            resizable: cx.new(|_| {
+                ResizablePanelGroup::new(
+                    |_, _| {
+                        v_flex()
+                            .gap_2()
+                            .child(Label::new("Left panel").weight(gpui::FontWeight::SEMIBOLD))
+                            .child(Label::new("Drag the handle to resize.").color(Color::Muted))
+                            .into_any_element()
+                    },
+                    |_, _| {
+                        v_flex()
+                            .gap_2()
+                            .child(Label::new("Right panel").weight(gpui::FontWeight::SEMIBOLD))
+                            .child(Label::new("Clamped between 20% and 80%.").color(Color::Muted))
+                            .into_any_element()
+                    },
+                )
+                .min_left_fraction(0.2)
+                .max_left_fraction(0.8)
+            }),
+            menubar: None,
         }
+    }
+
+    /// Lazily creates (once) and returns the shared `Menubar` demo entity.
+    ///
+    /// Building the menubar's dropdown `ContextMenu`s requires `&mut Window`
+    /// (see `ContextMenu::build`), which `GalleryApp::new` does not receive —
+    /// so this entity can't be constructed alongside the others above. The
+    /// `Option` guard ensures it is still only ever created the first time
+    /// this is called, never on subsequent re-renders, preserving open/closed
+    /// menu state exactly like the entities created in `new()`.
+    pub(crate) fn ensure_menubar(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<Menubar> {
+        if self.menubar.is_none() {
+            let file_menu = ContextMenu::build(window, cx, |this, _, _| {
+                this.entry("New Tab", None, |_, _| {})
+                    .entry("New Window", None, |_, _| {})
+                    .separator()
+                    .entry("Close Tab", None, |_, _| {})
+            });
+            let edit_menu = ContextMenu::build(window, cx, |this, _, _| {
+                this.entry("Undo", None, |_, _| {})
+                    .entry("Redo", None, |_, _| {})
+                    .separator()
+                    .entry("Cut", None, |_, _| {})
+                    .entry("Copy", None, |_, _| {})
+                    .entry("Paste", None, |_, _| {})
+            });
+            let view_menu = ContextMenu::build(window, cx, |this, _, _| {
+                this.entry("Sidebar", None, |_, _| {})
+                    .entry("Panel", None, |_, _| {})
+            });
+            self.menubar = Some(cx.new(|cx| {
+                Menubar::new(cx)
+                    .item("File", file_menu)
+                    .item("Edit", edit_menu)
+                    .item("View", view_menu)
+            }));
+        }
+        self.menubar
+            .clone()
+            .expect("menubar was just initialized above")
     }
 }
 
@@ -136,9 +306,9 @@ impl Render for GalleryApp {
             GalleryPage::Forms => self.render_forms(window, cx),
             GalleryPage::Feedback => pages::feedback::render(window, cx),
             GalleryPage::Navigation => self.render_navigation(window, cx),
-            GalleryPage::Data => pages::data::render(window, cx),
+            GalleryPage::Data => self.render_data(window, cx),
             GalleryPage::Overlays => self.render_overlays(window, cx),
-            GalleryPage::Layout => pages::layout::render(window, cx),
+            GalleryPage::Layout => self.render_layout(window, cx),
             GalleryPage::Examples => self.render_examples(window, cx),
         };
 
