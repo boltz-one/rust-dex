@@ -3,7 +3,6 @@ name = "boltz-sum-tree"
 version = "0.1.0"
 edition.workspace = true
 publish = true
-license = "Apache-2.0"
 description = "A sum tree data structure, a concurrency-friendly B-tree"
 
 repository.workspace = true

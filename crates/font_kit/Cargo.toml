@@ -3,7 +3,6 @@ name = "font_kit"
 version = "0.14.1-zed"
 authors = ["Patrick Walton <pcwalton@mimiga.net>"]
 description = "A cross-platform font loading library (vendored from zed-industries/font-kit)"
-license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/servo/font-kit"
 homepage = "https://github.com/servo/font-kit"
