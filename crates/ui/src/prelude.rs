@@ -28,15 +28,16 @@ pub use crate::traits::visible_on_hover::*;
 pub use crate::{
     ActionPanel, Alert, AlertDialog, AppShell, AspectRatio, Badge, BadgeColor, BadgeVariant,
     Breadcrumb, BreadcrumbItem, CalendarPreview, Card, CardVariant, CarouselPreview, Chart,
-    ChartKind, Checkbox, Combobox, Command, Container, DatePickerPreview, DescriptionList,
-    DescriptionListMode, Drawer, EmptyState, Feed, FileInput, Form, FormField, HoverCard,
-    InputGroup, InputOtp, Item, Kbd, LayoutTable, LayoutTableBody, LayoutTableCaption,
-    LayoutTableCell, LayoutTableFooter, LayoutTableHead, LayoutTableHeader, LayoutTableRow,
-    MediaObject, Menubar, MultiSelect, Navbar, NavigationMenuPreview, PageHeading, Pagination,
-    RadioButton, ResizablePreview, SearchInput, SectionHeading, SegmentedControl, Select,
-    SheetSide, Sidebar, SidebarItem, Skeleton, Slider, SonnerStackPreview, Spinner, StatsCard,
-    StatsTrend, Stepper, StepperStep, Switch, TextInput, Textarea, ToastStack, ToggleGroup,
-    ToggleGroupItem, ToggleGroupMode, VerticalNav, VerticalNavItem,
+    ChartKind, Checkbox, CodeEditor, Combobox, Command, CommandItem, CommandPalette, Container,
+    DatePickerPreview, DescriptionList, DescriptionListMode, Drawer, EmptyState, Feed, FileInput,
+    Form, FormField, HoverCard, InputGroup, InputOtp, Item, Kbd, LayoutTable, LayoutTableBody,
+    LayoutTableCaption, LayoutTableCell, LayoutTableFooter, LayoutTableHead, LayoutTableHeader,
+    LayoutTableRow, MediaObject, Menubar, MultiSelect, Navbar, NavigationMenuPreview,
+    PageHeading, Pagination, RadioButton, ResizablePreview, SearchInput, SectionHeading,
+    SegmentedControl, Select, SheetSide, Sidebar, SidebarItem, Skeleton, Slider,
+    SonnerStackPreview, Spinner, StatsCard, StatsTrend, Stepper, StepperStep, Switch,
+    TextInput, Textarea, ToastStack, ToggleGroup, ToggleGroupItem, ToggleGroupMode, VerticalNav,
+    VerticalNavItem,
 };
 pub use crate::{
     Button, ButtonGroup, ButtonSize, ButtonSizeAlias, ButtonStyle, ButtonVariant, IconButton,
@@ -46,7 +47,7 @@ pub use crate::{ButtonCommon, Color};
 pub use crate::{Headline, HeadlineSize};
 pub use crate::{Icon, IconName, IconPosition, IconSize};
 pub use crate::{Label, LabelCommon, LabelSize, LineHeightStyle, LoadingLabel};
-pub use crate::{combobox_preview, multi_select_preview, search_input_preview};
+pub use crate::{code_editor_preview, combobox_preview, multi_select_preview, search_input_preview};
 pub use crate::{h_flex, v_flex};
 pub use crate::{
     h_group, h_group_lg, h_group_sm, h_group_xl, v_group, v_group_lg, v_group_sm, v_group_xl,

@@ -22,7 +22,7 @@ A minimal, cross-platform Rust desktop application template built on GPUI — a 
 ### What's NOT Included
 
 - **No persistence layer**: no database, no SQLite, no file-based state. Intentionally removed to keep template focused. Re-add when app needs state.
-- **No bundled assets**: no fonts, no icons, no themes on disk. Uses system fonts and built-in fallback themes only.
+- **No bundled assets**: no fonts, no icons, no themes on disk. Uses system fonts and built-in fallback themes only (consumer crates/apps may bundle their own assets via the `rust-embed` pattern established in `boltz-icons`/`boltz-fonts-ibm-plex`; the template itself ships none).
 - **No web backend**: no wasm, no web server, no REST API. Desktop native only.
 - **No cloud/collaboration/extensions**: removed product-specific features. Template is blank canvas.
 - **No app icon**: window opens with OS-default icon. Provide one via `assets/` if needed.

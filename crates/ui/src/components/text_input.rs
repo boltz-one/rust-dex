@@ -25,6 +25,7 @@ pub struct TextInput {
     focus_handle: FocusHandle,
     multiline: bool,
     validation: InputValidationState,
+    read_only: bool,
 }
 
 impl TextInput {
@@ -35,6 +36,7 @@ impl TextInput {
             focus_handle: cx.focus_handle(),
             multiline: false,
             validation: InputValidationState::Neutral,
+            read_only: false,
         }
     }
 
@@ -45,6 +47,13 @@ impl TextInput {
 
     pub fn multiline(mut self, multiline: bool) -> Self {
         self.multiline = multiline;
+        self
+    }
+
+    /// When `true`, the input no longer accepts keyboard edits (used for
+    /// read-only code previews). Focus/selection styling is unaffected.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
         self
     }
 
@@ -100,7 +109,18 @@ impl TextInput {
         cx.notify();
     }
 
+    /// Dynamically toggles read-only mode after construction (e.g.
+    /// `CodeEditor` switching an already-created input between editable and
+    /// preview modes). Notifies for re-render.
+    pub fn set_read_only(&mut self, read_only: bool, cx: &mut Context<Self>) {
+        self.read_only = read_only;
+        cx.notify();
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.read_only {
+            return;
+        }
         let keystroke = &event.keystroke;
         // Ignore keyboard shortcuts (cmd/ctrl chords) — only capture text input.
         if keystroke.modifiers.control || keystroke.modifiers.platform {
@@ -173,7 +193,7 @@ impl Render for TextInput {
             .border_color(border_color)
             .text_color(text_color)
             .child(display)
-            .when(focused && !is_empty, |this| {
+            .when(focused && !is_empty && !self.read_only, |this| {
                 this.child(div().w(px(1.)).h(px(16.)).bg(palette::primary(500)))
             });
 
