@@ -5,7 +5,7 @@
 - **Rust Edition**: 2024
 - **Toolchain**: Stable (no nightly features)
 - **MSRV**: Stable toolchain supports edition 2024
-- **Publish**: Disabled across workspace (`publish = false` in `Cargo.toml`)
+- **Publish**: Enabled — workspace `publish = true`; crates namespaced `boltz-*` for crates.io (see scripts/publish-crates.sh)
 
 ## Formatting & Linting
 

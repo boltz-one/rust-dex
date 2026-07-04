@@ -33,6 +33,7 @@ cd "$REPO_ROOT"
 
 # Topological publish order (dependencies first). Package names as published on crates.io.
 PACKAGES=(
+  boltz-font-kit
   boltz-collections
   boltz-derive-refineable
   boltz-gpui-macros
@@ -49,6 +50,19 @@ PACKAGES=(
   boltz-tracing-facade
   boltz-sum-tree
   boltz-gpui
+  boltz-syntax-theme
+  boltz-icons
+  boltz-menu
+  boltz-ui-macros
+  boltz-gpui-wgpu
+  boltz-gpui-windows
+  boltz-theme
+  boltz-gpui-linux
+  boltz-gpui-macos
+  boltz-component
+  boltz-gpui-platform
+  boltz-ui
+  boltz-app
 )
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }

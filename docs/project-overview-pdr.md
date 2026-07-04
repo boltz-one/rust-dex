@@ -96,7 +96,7 @@ Platform selection happens via `gpui_platform::application()` — users never wr
 
 - **Edition**: Rust 2024
 - **Toolchain**: stable
-- **Publishing**: disabled (`publish = false` in workspace)
+- **Publishing**: enabled — workspace `publish = true`; crates publish to crates.io under `boltz-*` names (see scripts/publish-crates.sh)
 - **Formatters**: rustfmt with 2024 edition style
 - **App ID**: `com.example.app` (platform-specific: used by Wayland desktop entry, Windows registry, macOS bundle)
 

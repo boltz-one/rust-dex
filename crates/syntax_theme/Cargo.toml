@@ -1,5 +1,5 @@
 [package]
-name = "syntax_theme"
+name = "boltz-syntax-theme"
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
