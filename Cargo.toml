@@ -36,7 +36,7 @@ members = [
 default-members = ["crates/app"]
 
 [workspace.package]
-publish = false
+publish = true
 edition = "2024"
 repository = "https://github.com/boltz-one/rust-dex"
 
