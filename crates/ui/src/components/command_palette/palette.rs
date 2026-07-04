@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, BoxShadow, Context, Entity, FocusHandle, Focusable, IntoElement,
-    KeyDownEvent, Pixels, Render, Window, black, div, point, px, rgb,
+    AnyElement, App, BoxShadow, Context, Entity, Focusable, IntoElement, KeyDownEvent, Pixels,
+    Render, Window, black, div, point, px, rgb,
 };
 
 use crate::{IconName, List, ListItem, TextInput, prelude::*};
@@ -246,11 +246,15 @@ impl Render for CommandPalette {
                     .overflow_hidden()
                     .child(self.render_query_row())
                     .child(
-                        div().flex_1().overflow_y_scroll().child(
-                            List::new()
-                                .empty_message("No matching commands")
-                                .children(rows),
-                        ),
+                        div()
+                            .id("command-palette-results")
+                            .flex_1()
+                            .overflow_y_scroll()
+                            .child(
+                                List::new()
+                                    .empty_message("No matching commands")
+                                    .children(rows),
+                            ),
                     ),
             )
     }
