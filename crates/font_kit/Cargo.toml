@@ -1,6 +1,7 @@
 [package]
 name = "font_kit"
 version = "0.14.1"
+edition = "2021"
 description = "A cross-platform font loading library"
 readme = "README.md"
 rust-version = "1.77"

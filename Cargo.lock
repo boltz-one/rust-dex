@@ -5638,7 +5638,7 @@ dependencies = [
 
 [[package]]
 name = "ui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "boltz-gpui",
  "boltz-gpui-macros",
@@ -5663,6 +5663,7 @@ name = "ui_gallery"
 version = "0.1.0"
 dependencies = [
  "boltz-gpui",
+ "chrono",
  "component",
  "gpui_platform",
  "icons",

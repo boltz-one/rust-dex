@@ -1,6 +1,15 @@
-# Component Catalog — `crates/ui`
+# Component Catalog — base set
 
-Verbatim constructors, the builders you'll actually use, and one idiomatic example per component. All are re-exported at the crate root (`ui::Button`, `ui::Label`, …) and most via `ui::prelude::*`. Source of truth: `crates/ui/src/components/<name>.rs` — each file has a `preview()` fn with gold-standard examples.
+Verbatim constructors, the builders you'll actually use, and one idiomatic example — for the
+**original Zed-derived component set** (Button/Toggle/Label/Icon/Tooltip/List/Modal/Popover/
+Disclosure/Banner/Progress/Avatar). All are re-exported at the crate root (`ui::Button`,
+`ui::Label`, …) and most via `ui::prelude::*`.
+
+For the ~90-component **shadcn-parity kit** added on top (Select, Combobox, Dialog, Drawer,
+Command, Calendar, DatePicker, Table, Tabs, Chart, Slider, Sonner, …) and the design-token
+system, see **`references/design-system.md`** — that is the current, complete catalog + rules.
+Source of truth for exact signatures either way: `crates/ui/src/components/<name>.rs` — each
+file has a `preview()` fn with gold-standard examples.
 
 Shared interaction traits (defined in `crates/ui/src/traits/`):
 - `Clickable` → `.on_click(handler)`, `.cursor_style(cs)`
@@ -217,7 +226,7 @@ pub enum IconSize { Indicator /*10px*/, XSmall /*12*/, Small /*14*/, Medium /*16
 Overlay an X / dot / triangle on an icon (e.g. "mute" badge on a mic).
 ```rust
 let badge = IconDecoration::new(IconDecorationKind::X, knockout_color, cx)
-    .color(cx.theme().status().error)
+    .color(palette::danger(500))
     .position(Point { x: px(-2.), y: px(-2.) });
 DecoratedIcon::new(Icon::new(IconName::Mic), Some(badge))
 ```
@@ -449,7 +458,7 @@ Chip::new(label: impl Into<SharedString>) -> Self
 ```
 ```rust
 Chip::new("Beta").label_color(Color::Accent)
-Chip::new("New").bg_color(cx.theme().colors().text_accent.opacity(0.1))
+Chip::new("New").bg_color(palette::primary(100))
 ```
 
 ---
@@ -579,7 +588,12 @@ Vector::square(vector, size: Rems)
 
 ## 13. Colors · Severity · Elevation
 
-### `Color` (semantic — use this, not raw `Hsla`, whenever possible)
+**For any `bg()`/`border_color()`/fill on a `div()` or new component, use the design tokens —
+`semantic::*(cx)` (neutrals) / `palette::role(step)` (accents/status) — not raw `cx.theme()`
+calls or `Hsla` literals. Full rules: `references/design-system.md` §1.** The `Color` enum below
+remains the idiomatic way to color *text* (`Label::new("x").color(Color::Error)`).
+
+### `Color` (for `Label`/`Icon` text — still current)
 ```rust
 pub enum Color {
     Default,  // foreground text
@@ -590,26 +604,16 @@ pub enum Color {
     Created, Modified, Deleted, Ignored,
     VersionControlAdded/Conflict/Deleted/Ignored/Modified,
     Debugger, Player(u32),
-    Custom(Hsla),  // avoid — detaches from theme semantics
+    Custom(Hsla),  // avoid — prefer palette::role(step) for an arbitrary accent
 }
 ```
-Resolve to `Hsla` via `color.color(cx)`. `Label::new("x").color(Color::Error)` is the idiomatic way to color text.
+Resolve to `Hsla` via `color.color(cx)`.
 
 ### `Severity`
 ```rust
 pub enum Severity { Info, Success, Warning, Error }
 ```
 Used by `Banner`, `Callout`, and status indicators. Maps to icon + color automatically.
-
-### Theme access — `cx.theme()`
-```rust
-cx.theme().colors().text / .text_muted / .text_accent / .text_disabled / .text_placeholder
-cx.theme().colors().border / .border_variant / .element_background / .editor_background / .surface_background
-cx.theme().colors().background / .elevated_surface_background
-cx.theme().status().error / .warning / .success / .info / .hint / .created / .modified / .deleted / .conflict / .ignored
-cx.theme().colors().version_control_added / .modified / ...
-```
-Trait `ActiveTheme` is in `ui::prelude::*` (re-exported from `theme`), so `cx.theme()` works anywhere you have `&App`/`&Context<T>`.
 
 ### `ElevationIndex` (for `.layer(...)` and `elevation_N(cx)`)
 Layers: `Background`, `Elevated`, etc. `.elevation_3(cx)` applies the elevated-surface bg + shadow used by modals.

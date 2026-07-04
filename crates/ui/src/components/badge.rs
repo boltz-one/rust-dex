@@ -19,6 +19,7 @@ pub enum BadgeVariant {
 pub enum BadgeColor {
     #[default]
     Neutral,
+    Secondary,
     Primary,
     Success,
     Warning,
@@ -28,7 +29,7 @@ pub enum BadgeColor {
 impl BadgeColor {
     fn shade(self, step: u16) -> Hsla {
         match self {
-            BadgeColor::Neutral => palette::neutral(step),
+            BadgeColor::Neutral | BadgeColor::Secondary => palette::neutral(step),
             BadgeColor::Primary => palette::primary(step),
             BadgeColor::Success => palette::success(step),
             BadgeColor::Warning => palette::warning(step),
@@ -73,7 +74,7 @@ impl Badge {
 }
 
 impl RenderOnce for Badge {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let mut base = h_flex()
             .items_center()
             .gap_1()
@@ -81,29 +82,56 @@ impl RenderOnce for Badge {
             .py_0p5()
             .rounded_full();
 
+        // shadcn's `secondary` badge is a distinct neutral-solid role
+        // (theme `--secondary`/`--secondary-foreground`), not just a
+        // lighter/darker shade of `Neutral` — read it from `semantic` so it
+        // tracks the active theme instead of aliasing `Neutral`'s static
+        // palette shades.
+        let is_secondary = self.color == BadgeColor::Secondary;
+        let (fill, fill_text, dot_color, outline_border, outline_text) = if is_secondary {
+            let bg = semantic::secondary_bg(cx);
+            let fg = semantic::secondary_fg(cx);
+            (bg, fg, fg, semantic::border(cx), fg)
+        } else {
+            match self.variant {
+                BadgeVariant::Solid => (
+                    self.color.shade(600),
+                    white(),
+                    self.color.shade(500),
+                    self.color.shade(300),
+                    self.color.shade(700),
+                ),
+                BadgeVariant::Soft | BadgeVariant::Outline => (
+                    self.color.shade(100),
+                    self.color.shade(800),
+                    self.color.shade(500),
+                    self.color.shade(300),
+                    self.color.shade(700),
+                ),
+            }
+        };
+
         base = match self.variant {
-            BadgeVariant::Soft => base
-                .bg(self.color.shade(100))
-                .text_color(self.color.shade(800)),
-            BadgeVariant::Solid => base.bg(self.color.shade(600)).text_color(white()),
+            BadgeVariant::Soft | BadgeVariant::Solid => base.bg(fill).text_color(fill_text),
             BadgeVariant::Outline => base
                 .border_1()
-                .border_color(self.color.shade(300))
-                .text_color(self.color.shade(700)),
+                .border_color(outline_border)
+                .text_color(outline_text),
+        };
+
+        let text_color = match self.variant {
+            BadgeVariant::Outline => outline_text,
+            _ => fill_text,
         };
 
         base.when(self.dot, |this| {
-            this.child(div().size_1p5().rounded_full().bg(self.color.shade(500)))
+            this.child(div().size_1p5().rounded_full().bg(dot_color))
         })
         .child(
             Label::new(self.label)
                 .size(LabelSize::XSmall)
                 .weight(FontWeight::MEDIUM)
-                .color(Color::Custom(match self.variant {
-                    BadgeVariant::Solid => white(),
-                    BadgeVariant::Soft => self.color.shade(800),
-                    BadgeVariant::Outline => self.color.shade(700),
-                })),
+                .color(Color::Custom(text_color)),
         )
     }
 }
@@ -120,6 +148,7 @@ impl Component for Badge {
     fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
         let colors = [
             ("Neutral", BadgeColor::Neutral),
+            ("Secondary", BadgeColor::Secondary),
             ("Primary", BadgeColor::Primary),
             ("Success", BadgeColor::Success),
             ("Warning", BadgeColor::Warning),

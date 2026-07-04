@@ -6,11 +6,12 @@ use gpui::{
 
 use crate::TextInput;
 use crate::prelude::*;
+use crate::utils::fuzzy_subsequence_score;
 
 /// A typeahead-filtered select: a `TextInput` (typed filter) plus a
 /// `DropdownMenu`-style popover list of options filtered by
-/// **case-insensitive substring match** (no fuzzy-match / async / remote
-/// data — out of scope per plan). Selecting an option sets the input's
+/// **case-insensitive substring match** by default, or optional subsequence
+/// fuzzy filter via [`Combobox::fuzzy_filter`]. Selecting an option sets the input's
 /// display text via `TextInput::set_text`.
 ///
 /// Stateful view — create with `cx.new(|cx| Combobox::new(cx, options))`.
@@ -18,6 +19,7 @@ pub struct Combobox {
     options: Vec<SharedString>,
     selected: Option<usize>,
     open: bool,
+    fuzzy_filter: bool,
     input: Entity<TextInput>,
     /// Real screen bounds of the trigger row, captured via an invisible
     /// `canvas()` measurement child every render and read back on the
@@ -37,6 +39,7 @@ impl Combobox {
             options: options.into_iter().map(Into::into).collect(),
             selected: None,
             open: false,
+            fuzzy_filter: false,
             input,
             trigger_bounds: Rc::new(Cell::new(None)),
         }
@@ -47,15 +50,49 @@ impl Combobox {
         self.selected.and_then(|i| self.options.get(i))
     }
 
-    /// Options matching the current filter text (case-insensitive substring).
+    /// Enables subsequence fuzzy filtering (hand-rolled, no external crate).
+    pub fn fuzzy_filter(mut self, fuzzy_filter: bool) -> Self {
+        self.fuzzy_filter = fuzzy_filter;
+        self
+    }
+
+    /// Options matching the current filter text.
     fn filtered(&self, cx: &App) -> Vec<(usize, SharedString)> {
-        let query = self.input.read(cx).text().to_lowercase();
-        self.options
-            .iter()
-            .enumerate()
-            .filter(|(_, option)| query.is_empty() || option.to_lowercase().contains(&query))
-            .map(|(i, option)| (i, option.clone()))
-            .collect()
+        let query = self.input.read(cx).text();
+        if query.is_empty() {
+            return self
+                .options
+                .iter()
+                .enumerate()
+                .map(|(i, option)| (i, option.clone()))
+                .collect();
+        }
+
+        if self.fuzzy_filter {
+            let mut matches: Vec<(usize, usize, SharedString)> = self
+                .options
+                .iter()
+                .enumerate()
+                .filter_map(|(i, option)| {
+                    fuzzy_subsequence_score(query, option).map(|score| (i, score, option.clone()))
+                })
+                .collect();
+            matches.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+            matches
+                .into_iter()
+                .map(|(i, _, option)| (i, option))
+                .collect()
+        } else {
+            let query_lower = query.to_lowercase();
+            self.options
+                .iter()
+                .enumerate()
+                .filter(|(_, option)| {
+                    query_lower.is_empty() || option.to_lowercase().contains(&query_lower)
+                })
+                .map(|(i, option)| (i, option.clone()))
+                .collect()
+        }
     }
 }
 

@@ -142,15 +142,19 @@ right_click_menu::<ContextMenu>("ctx")
     .trigger(move |_active, _, _| Label::new("right-click me"))
 ```
 
-### Use theme colors instead of hardcoded HSLA
+### Use design tokens instead of hardcoded HSLA
 ```rust
-// prefer semantic Color:
+// neutrals (surface/border/text/hover) — theme-driven, dark+light for free:
+div().bg(semantic::surface(cx)).border_color(semantic::border(cx))
+// accents/status — mode-agnostic ramps:
+div().bg(palette::primary(600))
+// text still goes through the semantic Color enum:
 Label::new("Error").color(Color::Error)
-// or theme directly:
-div().bg(cx.theme().colors().element_background)
-    .border_color(cx.theme().colors().border)
 ```
-`Color::Custom(hsla)` works but detaches from theme semantics — avoid unless you truly need an arbitrary color.
+Never write `hsla(...)`/`0xRRGGBB` literals or reach for raw `cx.theme().colors().*` in new code —
+`semantic`/`palette` are the current API (`references/design-system.md` §1). `Color::Custom(hsla)`
+and direct `cx.theme()` calls still compile (older components use them) but are legacy, not the
+pattern to copy.
 
 ## Source of truth reminder
 When a method/component isn't in this skill's references, read the local vendored source — it matches what compiles here:

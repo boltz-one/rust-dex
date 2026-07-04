@@ -5,6 +5,19 @@ use smallvec::SmallVec;
 /// Default width for a [`Drawer`] (Tailwind `w-96` ~= 384px).
 pub const DRAWER_WIDTH: Pixels = px(384.);
 
+/// Default height for top/bottom [`Drawer`] sheets (Tailwind `h-96` ~= 384px).
+pub const DRAWER_HEIGHT: Pixels = px(384.);
+
+/// Which edge of the container a [`Drawer`] (shadcn Sheet) anchors to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SheetSide {
+    Top,
+    #[default]
+    Right,
+    Bottom,
+    Left,
+}
+
 /// A side panel ("slide-over") anchored to the right edge of its container.
 ///
 /// Structurally a sibling of [`crate::Modal`] (header/body/footer), but
@@ -21,6 +34,8 @@ pub struct Drawer {
     children: SmallVec<[AnyElement; 2]>,
     footer: Option<ModalFooter>,
     width: Pixels,
+    height: Pixels,
+    side: SheetSide,
     container_scroll_handle: Option<ScrollHandle>,
     animate: bool,
 }
@@ -37,9 +52,17 @@ impl Drawer {
             children: SmallVec::new(),
             footer: None,
             width: DRAWER_WIDTH,
+            height: DRAWER_HEIGHT,
+            side: SheetSide::default(),
             container_scroll_handle: None,
             animate: true,
         }
+    }
+
+    /// Sets which edge the sheet slides in from (shadcn Sheet `side` prop).
+    pub fn side(mut self, side: SheetSide) -> Self {
+        self.side = side;
+        self
     }
 
     pub fn header(mut self, header: ModalHeader) -> Self {
@@ -52,9 +75,15 @@ impl Drawer {
         self
     }
 
-    /// Overrides the default `w-96` (384px) panel width.
+    /// Overrides the default `w-96` (384px) panel width (left/right sides).
     pub fn width(mut self, width: Pixels) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Overrides the default `h-96` (384px) panel height (top/bottom sides).
+    pub fn height(mut self, height: Pixels) -> Self {
+        self.height = height;
         self
     }
 
@@ -83,18 +112,28 @@ impl ParentElement for Drawer {
 
 impl RenderOnce for Drawer {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let panel = v_flex()
+        let border_color = semantic::border(cx);
+        let mut panel = v_flex()
             .id(self.id.clone())
             .absolute()
-            .top_0()
-            .right_0()
-            .h_full()
-            .w(self.width)
             .bg(semantic::elevated_surface(cx))
-            .border_l_1()
-            .border_color(semantic::border(cx))
+            .border_color(border_color)
             .shadow_level(Shadow::Xl)
-            .overflow_hidden()
+            .overflow_hidden();
+
+        panel = match self.side {
+            SheetSide::Right => panel.top_0().right_0().h_full().w(self.width).border_l_1(),
+            SheetSide::Left => panel.top_0().left_0().h_full().w(self.width).border_r_1(),
+            SheetSide::Top => panel.top_0().left_0().w_full().h(self.height).border_b_1(),
+            SheetSide::Bottom => panel
+                .bottom_0()
+                .left_0()
+                .w_full()
+                .h(self.height)
+                .border_t_1(),
+        };
+
+        panel = panel
             .child(self.header)
             .child(
                 v_flex()
@@ -111,7 +150,12 @@ impl RenderOnce for Drawer {
             .children(self.footer);
 
         if self.animate {
-            panel.animate_in_from_right(false).into_any_element()
+            match self.side {
+                SheetSide::Right => panel.animate_in_from_right(false).into_any_element(),
+                SheetSide::Left => panel.animate_in_from_left(false).into_any_element(),
+                SheetSide::Top => panel.animate_in_from_top(false).into_any_element(),
+                SheetSide::Bottom => panel.animate_in_from_bottom(false).into_any_element(),
+            }
         } else {
             panel.into_any_element()
         }

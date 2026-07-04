@@ -30,12 +30,13 @@
 //! `ContextMenu`. `Tab` already ships its own `debug_selector`, so the
 //! `TabBar`/`nav_tab` test below needed no `ui` crate changes at all.
 
+use chrono::{Datelike, Local};
 use gpui::{
     AnyView, Context, Entity, Focusable, Modifiers, Render, ScrollDelta, ScrollWheelEvent,
     TestAppContext, TouchPhase, VisualTestContext, Window, point, px, size,
 };
 use ui::prelude::*;
-use ui::{Combobox, MultiSelect, Select};
+use ui::{Combobox, DatePicker, MultiSelect, Select};
 
 // `ui_gallery` is a binary-only crate (no `[lib]` target), so integration
 // tests can't `use ui_gallery::...`. Instead, pull the same source modules in
@@ -192,6 +193,41 @@ fn open_select_alone(cx: &mut TestAppContext) -> (Entity<Select>, &mut VisualTes
     let visual_cx = VisualTestContext::from_window(window.into(), cx).into_mut();
     visual_cx.run_until_parked();
     (view, visual_cx)
+}
+
+/// Opens a bare `DatePicker` (no sibling, no `GalleryApp`/Layout page around
+/// it) as the window root directly. Deliberately standalone rather than
+/// driven through `GalleryApp::date_picker` on the Layout page: that page
+/// also renders its own always-visible `Calendar` demo, and once the
+/// `DatePicker`'s popover opens, its embedded `Calendar`'s day cells would
+/// carry the *same* `CALENDAR-DAY-{year}-{month}-{day}` `debug_selector` as
+/// the sibling standalone `Calendar` (same current month, both real
+/// `Calendar::new()` instances) — an ambiguous double-registration in
+/// `debug_bounds`'s selector map. A dedicated window with only the
+/// `DatePicker` sidesteps that entirely.
+fn open_date_picker_alone(cx: &mut TestAppContext) -> (Entity<DatePicker>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        theme::init(theme::LoadThemes::JustBase, cx);
+        theme::set_theme_settings_provider(Box::new(TestThemeSettingsProvider::default()), cx);
+    });
+
+    let window = cx.open_window(size(px(400.), px(500.)), |_window, cx| DatePicker::new(cx));
+    let view = window
+        .root(cx)
+        .expect("date picker window has no root entity");
+    let visual_cx = VisualTestContext::from_window(window.into(), cx).into_mut();
+    visual_cx.run_until_parked();
+    (view, visual_cx)
+}
+
+/// `VisualTestContext::debug_bounds` requires a `&'static str` selector, but
+/// the per-day `Calendar` selector below is only known at test run time
+/// (depends on the real current year/month). Leaking a short-lived `String`
+/// for the remainder of the test process is the standard trick for this
+/// (`TestAppContext`/`VisualTestContext` are process-local and torn down at
+/// exit, so the leak is bounded to a single test's lifetime).
+fn leak_selector(s: String) -> &'static str {
+    Box::leak(s.into_boxed_str())
 }
 
 /// Shared helper: force two unrelated `GalleryApp` re-renders (Forms ->
@@ -781,6 +817,358 @@ fn multi_select_option_list_floats_without_pushing_sibling(cx: &mut TestAppConte
     assert_eq!(
         sibling_before, sibling_after,
         "opening the MultiSelect's floating option list must not move the sibling element"
+    );
+}
+
+struct ShadcnButtonHarness;
+
+impl Render for ShadcnButtonHarness {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .debug_selector(|| "SHADCN-BUTTON-VARIANTS".into())
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(Button::new("v-default", "Default").variant(ButtonVariant::Default))
+                    .child(
+                        Button::new("v-secondary", "Secondary")
+                            .variant(ButtonVariant::Secondary)
+                            .shadcn_size(ButtonSizeAlias::Sm),
+                    )
+                    .child(Button::new("v-ghost", "Ghost").variant(ButtonVariant::Ghost)),
+            )
+    }
+}
+
+struct ToggleGroupHarness;
+
+impl Render for ToggleGroupHarness {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .debug_selector(|| "TOGGLE-GROUP-HARNESS".into())
+            .child(
+                ToggleGroup::new(
+                    "tg-test",
+                    [ToggleGroupItem::new("A"), ToggleGroupItem::new("B")],
+                )
+                .mode(ToggleGroupMode::Single)
+                .selected(vec![0]),
+            )
+    }
+}
+
+/// shadcn `ButtonVariant` aliases compile and render without panic.
+#[gpui::test]
+fn shadcn_button_variants_render(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        theme::init(theme::LoadThemes::JustBase, cx);
+        theme::set_theme_settings_provider(Box::new(TestThemeSettingsProvider::default()), cx);
+    });
+
+    let window = cx.open_window(size(px(640.), px(200.)), |_window, _cx| ShadcnButtonHarness);
+    let visual_cx = VisualTestContext::from_window(window.into(), cx).into_mut();
+    visual_cx.run_until_parked();
+    assert!(
+        visual_cx.debug_bounds("SHADCN-BUTTON-VARIANTS").is_some(),
+        "shadcn button variant row should render"
+    );
+}
+
+/// [`ToggleGroup`] renders in single-select mode without panic.
+#[gpui::test]
+fn toggle_group_single_select_renders(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        theme::init(theme::LoadThemes::JustBase, cx);
+        theme::set_theme_settings_provider(Box::new(TestThemeSettingsProvider::default()), cx);
+    });
+
+    let window = cx.open_window(size(px(400.), px(120.)), |_window, _cx| ToggleGroupHarness);
+    let visual_cx = VisualTestContext::from_window(window.into(), cx).into_mut();
+    visual_cx.run_until_parked();
+    assert!(
+        visual_cx.debug_bounds("TOGGLE-GROUP-HARNESS").is_some(),
+        "toggle group harness should render"
+    );
+}
+
+/// Gap-fill (`Calendar`, Layout page): closes the "no test coverage for
+/// calendar" gap. `Calendar` exposes no public mutator to select a day on an
+/// existing instance (only the render-time day-cell `on_click`, and a
+/// builder `selected()` that consumes `self`), so this drives the real click
+/// pipeline: navigates to the Layout page (where `GalleryApp::calendar` is
+/// actually rendered), locates today's real day cell via the
+/// `debug_selector` added to `crates/ui/src/components/calendar.rs`, and
+/// asserts `Calendar::selection()` — the same real getter `DatePicker`
+/// observes to close its popover — actually updated. Also asserts the
+/// `Entity<Calendar>` identity and the selection both survive unrelated
+/// `GalleryApp` re-renders (page switches), the same recreate-per-render
+/// regression class covered for `MultiSelect`/`Combobox`/`SearchInput` above.
+#[gpui::test]
+fn calendar_day_click_selects_and_persists_across_rerender(cx: &mut TestAppContext) {
+    let (gallery, cx) = open_gallery_tall(cx);
+
+    gallery.update(cx, |app, cx| {
+        app.page = GalleryPage::Layout;
+        cx.notify();
+    });
+    cx.run_until_parked();
+
+    let id_before = gallery.read_with(cx, |app, _| app.calendar.entity_id());
+    let selected_before = gallery.read_with(cx, |app, cx| app.calendar.read(cx).selection());
+    assert!(
+        selected_before.is_none(),
+        "Calendar should start with no day selected"
+    );
+
+    let today = Local::now().date_naive();
+    let selector = leak_selector(format!(
+        "CALENDAR-DAY-{}-{}-{}",
+        today.year(),
+        today.month(),
+        today.day()
+    ));
+    let bounds = cx
+        .debug_bounds(selector)
+        .expect("Layout page's Calendar today cell should have rendered bounds");
+
+    cx.simulate_click(bounds.center(), Modifiers::default());
+    cx.run_until_parked();
+
+    let selected_after = gallery.read_with(cx, |app, cx| app.calendar.read(cx).selection());
+    assert_eq!(
+        selected_after,
+        Some(today),
+        "clicking today's cell should select it via Calendar's real on_click wiring"
+    );
+
+    force_unrelated_rerenders(cx, &gallery);
+
+    let id_after = gallery.read_with(cx, |app, _| app.calendar.entity_id());
+    let selected_still = gallery.read_with(cx, |app, cx| app.calendar.read(cx).selection());
+    assert_eq!(
+        id_before, id_after,
+        "calendar Entity must persist (not be recreated) across GalleryApp re-renders"
+    );
+    assert_eq!(
+        selected_after, selected_still,
+        "selection must survive an unrelated GalleryApp re-render"
+    );
+}
+
+/// Gap-fill (`Carousel`, Layout page): closes the "no test coverage for
+/// carousel" gap. `Carousel` exposes a public `active_index()` getter but no
+/// public `next`/`prev` mutator, so this drives the real prev/next
+/// `IconButton` click pipeline via the `"CAROUSEL-NEXT"`/`"CAROUSEL-PREV"`
+/// `debug_selector`s added to `crates/ui/src/components/carousel.rs` (needed
+/// because `IconButton`'s own default `"ICON-{icon:?}"` selector collides
+/// with `Calendar`'s identically-iconed prev/next buttons on this same
+/// page). Asserts `active_index()` actually advances/retreats and that the
+/// `Entity<Carousel>` identity plus its active slide survive unrelated
+/// re-renders.
+#[gpui::test]
+fn carousel_next_prev_click_updates_active_index_and_persists(cx: &mut TestAppContext) {
+    let (gallery, cx) = open_gallery_tall(cx);
+
+    gallery.update(cx, |app, cx| {
+        app.page = GalleryPage::Layout;
+        cx.notify();
+    });
+    cx.run_until_parked();
+
+    assert_eq!(
+        gallery.read_with(cx, |app, cx| app.carousel.read(cx).active_index()),
+        0,
+        "Carousel should start on its first slide"
+    );
+
+    let next_bounds = cx
+        .debug_bounds("CAROUSEL-NEXT")
+        .expect("Layout page's Carousel next button should have rendered bounds");
+    cx.simulate_click(next_bounds.center(), Modifiers::default());
+    cx.run_until_parked();
+
+    assert_eq!(
+        gallery.read_with(cx, |app, cx| app.carousel.read(cx).active_index()),
+        1,
+        "clicking next should advance active_index via Carousel's real on_click wiring"
+    );
+
+    let prev_bounds = cx
+        .debug_bounds("CAROUSEL-PREV")
+        .expect("Layout page's Carousel prev button should have rendered bounds");
+    cx.simulate_click(prev_bounds.center(), Modifiers::default());
+    cx.run_until_parked();
+
+    assert_eq!(
+        gallery.read_with(cx, |app, cx| app.carousel.read(cx).active_index()),
+        0,
+        "clicking prev should retreat active_index via Carousel's real on_click wiring"
+    );
+
+    // Re-advance to slide 1 so the persistence check below has a non-default
+    // active_index to actually verify survives (0 is `Carousel::new`'s own
+    // starting value, which would trivially "survive" a recreated entity).
+    cx.simulate_click(next_bounds.center(), Modifiers::default());
+    cx.run_until_parked();
+    let id_before = gallery.read_with(cx, |app, _| app.carousel.entity_id());
+    let active_before = gallery.read_with(cx, |app, cx| app.carousel.read(cx).active_index());
+    assert_eq!(
+        active_before, 1,
+        "expected slide 1 after the second next click"
+    );
+
+    force_unrelated_rerenders(cx, &gallery);
+
+    let id_after = gallery.read_with(cx, |app, _| app.carousel.entity_id());
+    let active_after = gallery.read_with(cx, |app, cx| app.carousel.read(cx).active_index());
+    assert_eq!(
+        id_before, id_after,
+        "carousel Entity must persist (not be recreated) across GalleryApp re-renders"
+    );
+    assert_eq!(
+        active_before, active_after,
+        "active slide must survive an unrelated GalleryApp re-render"
+    );
+}
+
+/// Gap-fill (`DatePicker`): closes the "no test coverage for date_picker"
+/// gap. Opens a standalone `DatePicker` (see `open_date_picker_alone`'s doc
+/// comment for why this uses its own window rather than the gallery's
+/// Layout page), clicks the real trigger (`debug_selector`
+/// `"DATE-PICKER-TRIGGER"`, added to `crates/ui/src/components/date_picker.rs`)
+/// to open the popover, then clicks today's real day cell in the embedded
+/// `Calendar` (the same `"CALENDAR-DAY-{y}-{m}-{d}"` selector the standalone
+/// `Calendar` test above uses — unambiguous here since this window renders
+/// only one `Calendar`). Asserts `DatePicker::value()` — the real public
+/// getter, driven by `DatePicker`'s own `cx.observe(&calendar, ...)` wiring,
+/// not a hand-set field — updates to the clicked date, and that the popover
+/// actually closed (`"DATE-PICKER-POPOVER"` no longer resolves), matching
+/// `DatePicker::new`'s documented `cx.observe` behavior.
+#[gpui::test]
+fn date_picker_calendar_selection_sets_value_and_closes(cx: &mut TestAppContext) {
+    let (date_picker, cx) = open_date_picker_alone(cx);
+
+    assert_eq!(
+        date_picker.read_with(cx, |picker, _| picker.value()),
+        None,
+        "DatePicker should start with no value picked"
+    );
+
+    let trigger_bounds = cx
+        .debug_bounds("DATE-PICKER-TRIGGER")
+        .expect("DatePicker trigger should have rendered bounds");
+    cx.simulate_click(trigger_bounds.center(), Modifiers::default());
+    cx.run_until_parked();
+
+    assert!(
+        cx.debug_bounds("DATE-PICKER-POPOVER").is_some(),
+        "clicking the trigger should open the popover"
+    );
+
+    let today = Local::now().date_naive();
+    let selector = leak_selector(format!(
+        "CALENDAR-DAY-{}-{}-{}",
+        today.year(),
+        today.month(),
+        today.day()
+    ));
+    let day_bounds = cx
+        .debug_bounds(selector)
+        .expect("DatePicker's embedded Calendar today cell should have rendered bounds");
+    cx.simulate_click(day_bounds.center(), Modifiers::default());
+    cx.run_until_parked();
+
+    assert_eq!(
+        date_picker.read_with(cx, |picker, _| picker.value()),
+        Some(today),
+        "selecting today in the embedded Calendar should update DatePicker's value via its real cx.observe wiring"
+    );
+    assert!(
+        cx.debug_bounds("DATE-PICKER-POPOVER").is_none(),
+        "picking a date should close the popover, per DatePicker::new's cx.observe wiring"
+    );
+}
+
+/// Gap-fill (`Chart`, Data page): closes the "no test coverage for chart"
+/// gap. `Chart` has no interactive state to drive (it is a pure data-in
+/// `canvas()` renderer), so this asserts the real render contract instead:
+/// navigating to the Data page and letting the window redraw does not panic,
+/// and each of the four `ChartKind` variants `Chart::preview` renders
+/// (Bar/Line/Area/Pie) has real, non-`None` bounds via the `debug_selector`
+/// added to `crates/ui/src/components/chart.rs`.
+#[gpui::test]
+fn chart_page_renders_all_kinds_without_panic(cx: &mut TestAppContext) {
+    let (gallery, cx) = open_gallery_tall(cx);
+
+    gallery.update(cx, |app, cx| {
+        app.page = GalleryPage::Data;
+        cx.notify();
+    });
+    cx.run_until_parked();
+
+    assert_eq!(
+        gallery.read_with(cx, |app, _| app.page),
+        GalleryPage::Data,
+        "GalleryApp::page should reflect the Data page after dispatch"
+    );
+
+    for selector in ["CHART-Bar", "CHART-Line", "CHART-Area", "CHART-Pie"] {
+        assert!(
+            cx.debug_bounds(selector).is_some(),
+            "Data page's Chart preview should render a real {selector} instance"
+        );
+    }
+}
+
+/// Gap-fill (`InputOtp`, Forms page): closes the remaining "no test coverage
+/// for input_otp" gap. Same real focus + `simulate_input` keystroke pipeline
+/// as `text_input_focuses_and_types` above (`InputOtp` implements
+/// `Focusable` directly), typing across all 6 slots via `InputOtp`'s real
+/// `on_key_down` wiring, then asserting the real `value()` getter and that
+/// the `Entity<InputOtp>` plus its typed value survive an unrelated
+/// `GalleryApp` re-render.
+#[gpui::test]
+fn input_otp_types_across_slots_and_persists(cx: &mut TestAppContext) {
+    let (gallery, cx) = open_gallery(cx);
+
+    gallery.update(cx, |app, cx| {
+        app.page = GalleryPage::Forms;
+        cx.notify();
+    });
+    cx.run_until_parked();
+
+    let input_otp = gallery.read_with(cx, |app, _| app.input_otp.clone());
+    assert_eq!(
+        input_otp.read_with(cx, |otp, _| otp.value()),
+        "",
+        "InputOtp should start empty"
+    );
+
+    cx.update(|window, cx| {
+        let handle = input_otp.focus_handle(cx);
+        window.focus(&handle, cx);
+    });
+
+    cx.simulate_input("123456");
+
+    assert_eq!(
+        input_otp.read_with(cx, |otp, _| otp.value()),
+        "123456",
+        "typed keystrokes should fill each slot via InputOtp's real on_key_down wiring"
+    );
+
+    let id_before = input_otp.entity_id();
+    force_unrelated_rerenders(cx, &gallery);
+    let id_after = gallery.read_with(cx, |app, _| app.input_otp.entity_id());
+
+    assert_eq!(
+        id_before, id_after,
+        "input_otp Entity must persist (not be recreated) across GalleryApp re-renders"
+    );
+    assert_eq!(
+        gallery.read_with(cx, |app, cx| app.input_otp.read(cx).value()),
+        "123456",
+        "typed value must survive an unrelated GalleryApp re-render"
     );
 }
 
