@@ -1,5 +1,6 @@
 [package]
 name = "boltz-ui-macros"
+description = "Procedural macros supporting the boltz UI component library."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

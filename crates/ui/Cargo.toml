@@ -1,5 +1,6 @@
 [package]
 name = "boltz-ui"
+description = "High-level reusable GPUI UI components (Label, Button, Input, etc.)."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

@@ -1,5 +1,6 @@
 [package]
 name = "boltz-component"
+description = "Mid-level layout and component infrastructure for the boltz UI toolkit."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

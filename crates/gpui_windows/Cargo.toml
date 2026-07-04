@@ -1,5 +1,6 @@
 [package]
 name = "boltz-gpui-windows"
+description = "Windows GPUI backend: DirectX 12 rendering and Win32 windowing."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

@@ -1,5 +1,6 @@
 [package]
 name = "boltz-syntax-theme"
+description = "Syntax highlighting theme definitions for the boltz GPUI UI toolkit."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

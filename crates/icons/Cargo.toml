@@ -1,5 +1,6 @@
 [package]
 name = "boltz-icons"
+description = "Icon library and icon-rendering GPUI component."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

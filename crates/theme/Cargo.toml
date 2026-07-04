@@ -1,5 +1,6 @@
 [package]
 name = "boltz-theme"
+description = "Theme system for GPUI apps: built-in fallback themes, color palettes, and UI density."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

@@ -1,5 +1,6 @@
 [package]
 name = "boltz-gpui-wgpu"
+description = "Shared wgpu renderer and text system used by the Linux and Windows GPUI backends."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

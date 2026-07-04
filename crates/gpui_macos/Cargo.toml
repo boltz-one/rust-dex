@@ -1,5 +1,6 @@
 [package]
 name = "boltz-gpui-macos"
+description = "macOS GPUI backend: Metal rendering, Cocoa windowing, and Core Text font discovery."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true

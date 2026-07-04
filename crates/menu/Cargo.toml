@@ -1,5 +1,6 @@
 [package]
 name = "boltz-menu"
+description = "Desktop application menu system for GPUI apps."
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
