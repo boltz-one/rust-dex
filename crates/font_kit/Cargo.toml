@@ -3,6 +3,7 @@ name = "boltz-font-kit"
 version = "0.14.1"
 description = "A cross-platform font loading library"
 license = "Apache-2.0"
+repository.workspace = true
 edition = "2018"
 rust-version = "1.77"
 publish = true

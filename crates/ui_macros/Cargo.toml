@@ -5,6 +5,7 @@ version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
 license = "GPL-3.0-or-later"
+repository.workspace = true
 
 [lints]
 workspace = true
@@ -18,5 +19,5 @@ quote.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
-component.workspace = true
-ui.workspace = true
+component = { path = "../component", package = "boltz-component" }
+ui = { path = "../ui", package = "boltz-ui" }

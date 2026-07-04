@@ -5,6 +5,7 @@ name = "boltz-app"
 version = "0.1.0"
 publish.workspace = true
 license = "GPL-3.0-or-later"
+repository.workspace = true
 default-run = "boltz-app"
 
 [lints]
