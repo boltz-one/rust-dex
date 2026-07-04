@@ -6,6 +6,7 @@ members = [
     "crates/collections",
     "crates/component",
     "crates/font_kit",
+    "crates/fonts-ibm-plex",
     "crates/gpui",
     "crates/gpui_linux",
     "crates/gpui_macos",
@@ -45,6 +46,7 @@ collections = { path = "crates/collections", version = "0.1.0", package = "boltz
 component = { path = "crates/component", version = "0.1.0", package = "boltz-component" }
 derive_refineable = { path = "crates/refineable/derive_refineable", version = "0.1.0", package = "boltz-derive-refineable" }
 font_kit = { path = "crates/font_kit", version = "0.14.1", package = "boltz-font-kit" }
+fonts_ibm_plex = { path = "crates/fonts-ibm-plex", version = "0.1.0", package = "boltz-fonts-ibm-plex" }
 gpui = { path = "crates/gpui", default-features = false, version = "0.2.2", package = "boltz-gpui" }
 gpui_shared_string = { path = "crates/gpui_shared_string", version = "0.1.0", package = "boltz-gpui-shared-string" }
 gpui_linux = { path = "crates/gpui_linux", default-features = false, version = "0.1.0", package = "boltz-gpui-linux" }

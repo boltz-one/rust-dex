@@ -1,0 +1,18 @@
+[package]
+name = "boltz-fonts-ibm-plex"
+description = "Bundled IBM Plex Sans + IBM Plex Mono font assets (OFL-1.1)."
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+license = "GPL-3.0-or-later"
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/fonts_ibm_plex.rs"
+
+[dependencies]
+gpui.workspace = true
+rust-embed.workspace = true

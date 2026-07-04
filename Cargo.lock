@@ -675,6 +675,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "boltz-fonts-ibm-plex"
+version = "0.1.0"
+dependencies = [
+ "boltz-gpui",
+ "rust-embed",
+]
+
+[[package]]
 name = "boltz-gpui"
 version = "0.2.2"
 dependencies = [
