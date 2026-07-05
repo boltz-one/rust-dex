@@ -1,0 +1,57 @@
+[package]
+name = "boltz-acp"
+version = "0.1.0"
+edition.workspace = true
+publish = true
+license = "Apache-2.0"
+description = "Agent Client Protocol (ACP) client/runtime for GPUI"
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/acp.rs"
+doctest = false
+
+[features]
+test-support = []
+
+# Minimal real ACP agent (ndjson-over-stdio) used only by Phase 2's
+# integration tests (see tests/client_lifecycle.rs). Gated behind
+# `test-support` so `cargo check --workspace --all-targets` (which does not
+# enable optional features) skips it; run integration tests with
+# `cargo test -p boltz-acp --features test-support`.
+[[bin]]
+name = "acp-fake-agent"
+path = "tests/fixtures/fake_agent/main.rs"
+required-features = ["test-support"]
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+futures.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+log.workspace = true
+regex.workspace = true
+dirs.workspace = true
+percent-encoding.workspace = true
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+smol.workspace = true
+util.workspace = true
+agent-client-protocol.workspace = true
+agent-client-protocol-schema.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
