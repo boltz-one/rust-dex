@@ -1,7 +1,10 @@
-# gpui-probe
+# boltz-gpui-probe
 
 Shared element-tree core for a GPUI inspector overlay + an in-process UI test
 driver, built on `boltz-gpui` only (no theme/ui/icons dependency).
+
+> Published on crates.io as **`boltz-gpui-probe`**; imports as **`gpui_probe`**
+> (`boltz-gpui-probe = "0.1"` → `use gpui_probe::...`).
 
 - **`.probe("id")`** on any `IntoElement` records its real per-frame bounds into
   an app-wide `ElementRegistry` (via `gpui::canvas()`), with no `cfg`/feature

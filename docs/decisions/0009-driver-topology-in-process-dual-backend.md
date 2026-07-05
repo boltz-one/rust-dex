@@ -6,7 +6,7 @@
 
 ## Context
 
-We need to decide how the `gpui-probe` test driver (Cypress/Playwright-style)
+We need to decide how the `boltz-gpui-probe` test driver (Cypress/Playwright-style)
 actually delivers actions (click/type/wait) to a running `boltz-gpui` app.
 Research-02 surveys `egui_kittest` (in-process, frame-by-frame, no IPC) as the
 closest analog for an immediate-mode-adjacent Rust UI framework and finds no Rust

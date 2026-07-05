@@ -81,9 +81,9 @@ crates/
 - **Testing**: Use GPUI `TestAppContext`, no mocks
 - **Platform gates**: Never use `#[cfg]` in app code; use `gpui_platform` facade
 
-## gpui-probe
+## boltz-gpui-probe
 
-`crates/gpui-probe/` is a shared element-tree core for a GPUI inspector overlay and an in-process UI test driver, built on top of `boltz-gpui` only (no theme/ui/icons dependency).
+`crates/gpui-probe/` (published as `boltz-gpui-probe`, imports as `gpui_probe`) is a shared element-tree core for a GPUI inspector overlay and an in-process UI test driver, built on top of `boltz-gpui` only (no theme/ui/icons dependency).
 
 ## Reference
 

@@ -64,7 +64,7 @@ PACKAGES=(
   boltz-gpui-platform
   boltz-ui
   boltz-app
-  gpui-probe
+  boltz-gpui-probe
 )
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }

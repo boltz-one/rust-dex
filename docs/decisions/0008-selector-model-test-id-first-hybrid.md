@@ -6,7 +6,7 @@
 
 ## Context
 
-`gpui-probe` needs one locator model shared by the inspector and the driver.
+`boltz-gpui-probe` needs one locator model shared by the inspector and the driver.
 Research-02 (prior-art synthesis of Playwright/Testing-Library/egui_kittest/kittest)
 recommends role-first querying via AccessKit as industry best practice, with test-id
 as a last resort. Research-01, confirmed by direct source inspection (ADR 0007),
@@ -15,9 +15,9 @@ in `crates/gpui/src/`) — no roles, no labels, no accessibility tree at all. Wi
 in means writing a new AccessKit consumer against gpui's paint/layout internals from
 scratch.
 
-Because `gpui-probe` and `crates/gpui` share this workspace, that work is done
+Because `boltz-gpui-probe` and `crates/gpui` share this workspace, that work is done
 **upstream in `crates/gpui`** (adding the AccessKit consumer + public `hit_test`),
-then released as a new `boltz-gpui` version, and only then consumed by `gpui-probe` —
+then released as a new `boltz-gpui` version, and only then consumed by `boltz-gpui-probe` —
 not via a temporary fork/patch (ADR 0007).
 
 Meanwhile, ADR 0007 established that a test-id-keyed registry (`probe::track(id,

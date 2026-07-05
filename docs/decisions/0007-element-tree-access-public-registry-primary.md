@@ -6,7 +6,7 @@
 
 ## Context
 
-`gpui-probe` (GPUI inspector + UI test driver) is a new reusable crate that lives
+`boltz-gpui-probe` (GPUI inspector + UI test driver) is a new reusable crate that lives
 **inside this workspace (`boltz-gpui` / `rust-dex`)** alongside `crates/gpui`
 (published as `boltz-gpui`, currently v0.2.4). The crate depends on `crates/gpui`
 via a workspace **path + version** dependency (not a pinned `=0.2.4` literal, and
@@ -53,7 +53,7 @@ DispatchEventResult` **is already `pub`** (`window.rs:4274`), and
 with public fields. Routing (`hit_test`) is private, but *dispatching a known
 event* is not.
 
-Because `gpui-probe` lives in the same workspace as `crates/gpui`, the missing
+Because `boltz-gpui-probe` lives in the same workspace as `crates/gpui`, the missing
 capabilities are not a "maintain a fork" problem — they are an **upstream** problem:
 the seams can be made `pub` in `crates/gpui` directly, released as a new
 `boltz-gpui` version, and then depended on cleanly. There is no need for a
@@ -64,7 +64,7 @@ temporary `[patch]` fork.
 **PRIMARY (available on the current released `boltz-gpui`, no gpui change needed):
 a public-API parallel registry, built on `canvas()`.**
 
-- `gpui-probe` provides `probe::track(id: impl Into<SharedString>, element: impl
+- `boltz-gpui-probe` provides `probe::track(id: impl Into<SharedString>, element: impl
   IntoElement) -> impl IntoElement`, which wraps `element` together with a
   same-bounds `canvas()` sibling. The canvas's `paint` closure writes
   `ElementSnapshot { id, bounds, enabled, frame_seq }` into a `gpui::Global`
@@ -77,7 +77,7 @@ a public-API parallel registry, built on `canvas()`.**
 
 **DEFERRED, UPSTREAM-FIRST (not a fork): expose `Window::hit_test()` as public API
 in `base/crates/gpui` and add an AccessKit consumer there, then release a new
-`boltz-gpui` version, and only then enable the dependent `gpui-probe` capabilities.**
+`boltz-gpui` version, and only then enable the dependent `boltz-gpui-probe` capabilities.**
 Needed only for capabilities the registry cannot provide:
 1. General "what's at point (x, y)" queries without a known test-id (registry only
    answers "where is test-id X", not "what is at this pixel").
@@ -88,7 +88,7 @@ Needed only for capabilities the registry cannot provide:
    scratch either way.
 
 The sequence is strict: **land the `pub` `hit_test` + AccessKit consumer in
-`crates/gpui` upstream → cut a new `boltz-gpui` release → bump `gpui-probe`'s
+`crates/gpui` upstream → cut a new `boltz-gpui` release → bump `boltz-gpui-probe`'s
 workspace dependency to it → then turn on the dependent features.** No temporary
 `[patch]`-based fork of gpui is used at any point.
 
@@ -113,7 +113,7 @@ real-window driver backend (ADR 0009) that calls it directly via
   over-engineering (YAGNI). `canvas()` is gpui's own documented minimal API for
   exactly this ("low level paint API without defining a whole custom element").
 - **A temporary `[patch]` fork of gpui as the mechanism for the deferred
-  capabilities** — rejected. Because `gpui-probe` and `crates/gpui` share one
+  capabilities** — rejected. Because `boltz-gpui-probe` and `crates/gpui` share one
   workspace and one release train, the correct move is to upstream the missing
   `pub` surface into `crates/gpui` and release a new `boltz-gpui` version, never to
   carry a patched fork. A fork would fragment the source of `boltz-gpui` and block
@@ -124,7 +124,7 @@ real-window driver backend (ADR 0009) that calls it directly via
 
 ## Consequences
 
-- (+) `gpui-probe`'s core has zero dependency on any non-released gpui or non-default
+- (+) `boltz-gpui-probe`'s core has zero dependency on any non-released gpui or non-default
   Cargo feature; any app on the current `boltz-gpui` can add the dependency and
   start tracking elements today.
 - (+) Same registry serves both inspector and driver — one source of truth, per the

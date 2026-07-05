@@ -1,5 +1,6 @@
-//! `gpui-probe` — a shared element-tree core for a GPUI inspector overlay and
-//! an in-process UI test driver, built on top of `boltz-gpui`.
+//! `gpui_probe` (published on crates.io as `boltz-gpui-probe`) — a shared
+//! element-tree core for a GPUI inspector overlay and an in-process UI test
+//! driver, built on top of `boltz-gpui`.
 //!
 //! The crate exposes a single, shared representation of the rendered element
 //! tree so that two consumers can be built on top of it without duplicating

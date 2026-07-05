@@ -1,5 +1,8 @@
 [package]
-name = "gpui-probe"
+# Published on crates.io under the `boltz-` tree prefix; the Rust import name
+# stays `gpui_probe` (see [lib] below), so consumers write
+# `boltz-gpui-probe = "0.1"` and `use gpui_probe::...`.
+name = "boltz-gpui-probe"
 version = "0.1.0"
 description = "Shared element-tree core for a GPUI inspector overlay + in-process UI test driver"
 license = "Apache-2.0"
@@ -9,6 +12,9 @@ readme = "README.md"
 edition.workspace = true
 repository.workspace = true
 publish.workspace = true
+
+[lib]
+name = "gpui_probe"
 
 [dependencies]
 gpui = { workspace = true }
@@ -29,7 +35,7 @@ test-support = ["gpui/test-support"]
 # compile the driver (TestHarness) without needing `--features test-support` on
 # the CLI — and so rust-analyzer resolves it. Dev-dependencies never propagate to
 # downstream consumers, so release builds stay driver-free / test-support-free.
-gpui-probe = { path = ".", features = ["test-support"] }
+boltz-gpui-probe = { path = ".", features = ["test-support"] }
 # Snapshot testing (Phase 04). Dev-only: the library exposes serialization-free
 # tree-text (crate::snapshot); tests assert it via insta.
 insta = "1"

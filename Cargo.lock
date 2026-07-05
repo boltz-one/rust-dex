@@ -972,6 +972,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "boltz-gpui-probe"
+version = "0.1.0"
+dependencies = [
+ "boltz-gpui",
+ "boltz-gpui-probe",
+ "insta",
+ "rustc-hash 2.1.2",
+]
+
+[[package]]
 name = "boltz-gpui-shared-string"
 version = "0.1.0"
 dependencies = [
@@ -2797,16 +2807,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fdf242682df893b86f33a73828fb09ca4b2d3bb6cc95249707fc684d27484b91"
 dependencies = [
  "bitflags 2.13.0",
-]
-
-[[package]]
-name = "gpui-probe"
-version = "0.1.0"
-dependencies = [
- "boltz-gpui",
- "gpui-probe",
- "insta",
- "rustc-hash 2.1.2",
 ]
 
 [[package]]
