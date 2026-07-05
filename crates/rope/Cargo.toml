@@ -1,0 +1,33 @@
+[package]
+name = "boltz-rope"
+version = "0.1.0"
+edition.workspace = true
+publish = true
+license = "Apache-2.0"
+description = "A copy-on-write rope data structure for text buffers"
+
+repository.workspace = true
+[lints]
+workspace = true
+
+[lib]
+path = "src/rope.rs"
+doctest = false
+
+[dependencies]
+heapless.workspace = true
+log.workspace = true
+rayon.workspace = true
+sum_tree.workspace = true
+unicode-segmentation.workspace = true
+util.workspace = true
+tracing_facade.workspace = true
+tracing.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["tracing"]
+
+[dev-dependencies]
+rand.workspace = true
+gpui = { workspace = true, features = ["test-support"] }
+util = { workspace = true, features = ["test-support"] }

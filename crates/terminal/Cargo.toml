@@ -1,0 +1,23 @@
+[package]
+name = "boltz-terminal"
+version = "0.1.0"
+edition.workspace = true
+publish = true
+license = "Apache-2.0"
+description = "Real PTY terminal session (alacritty_terminal-backed), no GPUI view code"
+
+repository.workspace = true
+[lints]
+workspace = true
+
+[lib]
+path = "src/terminal.rs"
+doctest = false
+
+[dependencies]
+alacritty_terminal.workspace = true
+anyhow.workspace = true
+async-channel.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true

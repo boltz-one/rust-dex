@@ -30,7 +30,9 @@ use gpui::{
 use serde::Deserialize;
 
 pub use crate::default_colors::*;
-pub use crate::fallback_themes::{apply_status_color_defaults, apply_theme_color_defaults};
+pub use crate::fallback_themes::{
+    apply_status_color_defaults, apply_theme_color_defaults, default_themes,
+};
 pub use crate::font_family_cache::*;
 pub use crate::icon_theme::*;
 pub use crate::icon_theme_schema::*;

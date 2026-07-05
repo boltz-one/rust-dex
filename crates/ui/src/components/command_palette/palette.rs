@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, BoxShadow, Context, Entity, Focusable, IntoElement, KeyDownEvent, Pixels,
-    Render, Window, black, div, point, px, rgb,
+    AnyElement, App, Context, Entity, Focusable, IntoElement, KeyDownEvent, Pixels, Render, Window,
+    div, px, rgb,
 };
 
-use crate::{IconName, List, ListItem, TextInput, prelude::*};
+use crate::{IconName, List, ListItem, TextInput, overlay_backdrop, overlay_panel, prelude::*};
 
 use super::fuzzy::score;
 
@@ -77,8 +77,7 @@ pub struct CommandPalette {
 
 impl CommandPalette {
     pub fn new(cx: &mut Context<Self>, items: Vec<CommandPaletteItem>) -> Self {
-        let query_input =
-            cx.new(|cx| TextInput::new(cx).placeholder("Type a command or search…"));
+        let query_input = cx.new(|cx| TextInput::new(cx).placeholder("Type a command or search…"));
 
         cx.observe(&query_input, |this, _, cx| {
             this.selected_ix = 0;
@@ -219,30 +218,13 @@ impl Render for CommandPalette {
             .map(|(row_ix, item_ix)| self.render_row(*item_ix, row_ix == selected_ix))
             .collect();
 
-        div()
-            .absolute()
-            .inset_0()
-            .flex()
-            .items_center()
-            .justify_center()
-            .bg(black().opacity(0.5))
+        overlay_backdrop()
             .on_key_down(cx.listener(Self::handle_key_down))
             .child(
-                v_flex()
+                overlay_panel()
                     .w(COMMAND_PALETTE_WIDTH)
                     .max_w(vw(0.9, window))
                     .max_h(px(420.))
-                    .bg(rgb(0x12161C))
-                    .border_1()
-                    .border_color(rgb(0x2A313B))
-                    .rounded(px(14.))
-                    .shadow(vec![BoxShadow {
-                        color: black().opacity(0.6),
-                        offset: point(px(0.), px(24.)),
-                        blur_radius: px(70.),
-                        spread_radius: px(0.),
-                    }])
-                    .overflow_hidden()
                     .child(self.render_query_row())
                     .child(
                         div()

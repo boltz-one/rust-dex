@@ -1,6 +1,6 @@
 use gpui::{AnyElement, Context, Window};
-use ui::AspectRatio;
 use ui::prelude::*;
+use ui::{AspectRatio, PaneGroupPreview, TitleBar};
 
 use crate::gallery_app::GalleryApp;
 
@@ -44,6 +44,27 @@ impl GalleryApp {
             .child(section(
                 "Carousel",
                 Some(self.carousel.clone().into_any_element()),
+            ))
+            .child(section(
+                "Code Editor",
+                Some(code_editor_preview(window, cx)),
+            ))
+            .child(section("Title Bar", TitleBar::preview(window, cx)))
+            .child(section("Pane Group", PaneGroupPreview::preview(window, cx)))
+            .child(section(
+                "Terminal Panel (chrome only, no PTY)",
+                Some(terminal_panel_preview(window, cx)),
+            ))
+            .child(section(
+                "Terminal View (real PTY, macOS-verified only)",
+                Some(
+                    div()
+                        .h(px(280.))
+                        .rounded_lg()
+                        .overflow_hidden()
+                        .child(self.terminal_view.clone())
+                        .into_any_element(),
+                ),
             ))
             .into_any_element()
     }

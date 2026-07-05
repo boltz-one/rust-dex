@@ -57,6 +57,20 @@ impl GalleryApp {
                 Some(self.command.clone().into_any_element()),
             ))
             .child(section(
+                "Tab Switcher",
+                Some(
+                    // `.relative()` + a fixed height confines the switcher's
+                    // `.absolute().inset_0()` backdrop to this box instead of
+                    // covering the whole gallery content pane.
+                    div()
+                        .relative()
+                        .w_full()
+                        .h(px(320.))
+                        .child(self.tab_switcher.clone())
+                        .into_any_element(),
+                ),
+            ))
+            .child(section(
                 "Toast (deprecated)",
                 Some(
                     Label::new("Skipped — shadcn deprecated Radix Toast in favor of Sonner.")

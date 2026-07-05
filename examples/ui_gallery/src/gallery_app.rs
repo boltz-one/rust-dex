@@ -4,7 +4,7 @@ use ui::prelude::*;
 use ui::{
     Calendar, Carousel, Combobox, Command, CommandItem, ContextMenu, DatePicker, InputOtp, Menubar,
     MultiSelect, NavigationMenu, NavigationMenuItemDef, NavigationMenuSubItem, ResizablePanelGroup,
-    SearchInput, SonnerStack,
+    SearchInput, SonnerStack, TabSwitcher, TabSwitcherItem, TerminalView,
 };
 
 use crate::pages;
@@ -87,6 +87,20 @@ pub struct GalleryApp {
     /// Command palette demo (Overlays page). Created once here — never in a
     /// `preview()`/render body — so typed queries and selection persist.
     pub(crate) command: Entity<Command>,
+    /// Tab switcher demo (Overlays page). Created once here — same reason as
+    /// `command` above — so ↑/↓ selection persists across re-renders instead
+    /// of resetting to index 0 every time `GalleryApp` re-renders for an
+    /// unrelated reason (e.g. the theme toggle).
+    pub(crate) tab_switcher: Entity<TabSwitcher>,
+    /// Real PTY terminal demo (Layout page). Created once here — unlike
+    /// every other `Entity` field, recreating this one on each render would
+    /// not just lose UI state but spawn a brand-new real shell child process
+    /// every time `GalleryApp` re-renders for an unrelated reason (e.g. the
+    /// theme toggle), since `TerminalView::new` spawns a PTY. `Drop` on the
+    /// old entity does clean up its shell, so this wouldn't literally leak
+    /// processes — but it would repeatedly kill and respawn a real shell,
+    /// which is real waste for zero benefit.
+    pub(crate) terminal_view: Entity<TerminalView>,
     /// OTP input demo. Created once here so slot focus/typed digits persist
     /// across re-renders (see `Forms` page usage of this component pattern).
     pub(crate) input_otp: Entity<InputOtp>,
@@ -175,6 +189,19 @@ impl GalleryApp {
                     ],
                 )
             }),
+            tab_switcher: cx.new(|cx| {
+                TabSwitcher::new(
+                    cx,
+                    vec![
+                        TabSwitcherItem::new("main.rs", |_, _| {}).icon(IconName::File),
+                        TabSwitcherItem::new("lib.rs", |_, _| {})
+                            .icon(IconName::File)
+                            .subtitle("crates/ui/src"),
+                        TabSwitcherItem::new("Cargo.toml", |_, _| {}).icon(IconName::File),
+                    ],
+                )
+            }),
+            terminal_view: cx.new(|cx| TerminalView::new(cx)),
             input_otp: cx.new(|cx| InputOtp::new(cx, 6)),
             calendar: cx.new(|_| Calendar::new()),
             date_picker: cx.new(DatePicker::new),

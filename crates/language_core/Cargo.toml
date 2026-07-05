@@ -1,0 +1,45 @@
+[package]
+name = "boltz-language-core"
+version = "0.1.0"
+edition.workspace = true
+publish = true
+license = "Apache-2.0"
+description = "Minimal tree-sitter language registry + highlight query runner (no LSP)"
+
+repository.workspace = true
+[lints]
+workspace = true
+
+[lib]
+path = "src/language_core.rs"
+doctest = false
+
+[dependencies]
+rope.workspace = true
+tree-sitter.workspace = true
+tree-sitter-javascript = { workspace = true, optional = true }
+tree-sitter-json = { workspace = true, optional = true }
+tree-sitter-md = { workspace = true, optional = true }
+tree-sitter-rust = { workspace = true, optional = true }
+tree-sitter-typescript = { workspace = true, optional = true }
+
+[features]
+# Rust enabled by default as the minimal working example (see Phase B ADR
+# in plans/20260705-1722-zed-ui-component-enrichment/phase-02-*.md): every
+# additional grammar is opt-in so consumers only pay the binary-size cost
+# (~200-300KB/grammar) for languages they actually use.
+default = ["lang-rust"]
+lang-rust = ["dep:tree-sitter-rust"]
+lang-javascript = ["dep:tree-sitter-javascript"]
+lang-typescript = ["dep:tree-sitter-typescript"]
+lang-markdown = ["dep:tree-sitter-md"]
+lang-json = ["dep:tree-sitter-json"]
+
+[package.metadata.cargo-machete]
+ignored = [
+    "tree-sitter-rust",
+    "tree-sitter-javascript",
+    "tree-sitter-typescript",
+    "tree-sitter-md",
+    "tree-sitter-json",
+]

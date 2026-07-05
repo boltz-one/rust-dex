@@ -2,7 +2,7 @@
 
 ## Workspace Structure
 
-The `rust-dex` repository is a Rust workspace with 35 crates under `crates/` and `examples/`. All crates share dependencies, edition (2024), and workspace metadata defined in `/Cargo.toml`.
+The `rust-dex` repository is a Rust workspace with 35+ crates under `crates/` and `examples/` (see `/Cargo.toml` `[workspace] members` for the authoritative, current list — this doc is a summary, not re-verified against every addition). All crates share dependencies, edition (2024), and workspace metadata defined in `/Cargo.toml`.
 
 ### Crate Categories
 
@@ -35,17 +35,25 @@ The `rust-dex` repository is a Rust workspace with 35 crates under `crates/` and
 
 | Crate | Role | Key Files |
 |-------|------|-----------|
-| **ui** | High-level reusable components: `Label`, `Button`, `Input`, etc., built on GPUI primitives. | `src/components/` (per-component modules) |
+| **ui** | High-level reusable components: `Label`, `Button`, `Input`, etc., built on GPUI primitives. Also: workspace-chrome components (`TabSwitcher`, `PaneGroup`, `TitleBar`) ported/redesigned from Zed's UI patterns; `CodeEditor` (real tree-sitter syntax highlighting when `read_only` + `.language(ext)` — see `language_core`); `TerminalPanel` (static chrome demo) and `TerminalView` (real PTY-backed, spawns an actual shell — see `terminal` crate). | `src/components/` (per-component modules) |
 | **component** | Mid-level layout & component infrastructure. | `src/component_layout.rs` `src/component.rs` |
 | **icons** | Icon library & icon rendering component. | Icon asset definitions, GPUI `Icon` element |
 | **ui_macros** | Macros for UI component definition. | Procedural macro support for `ui` crate |
+
+#### Editor & Terminal
+
+| Crate | Role | Key Files |
+|-------|------|-----------|
+| **rope** | Copy-on-write rope text buffer (ported from Zed's `rope` crate). Zero coupling to Zed-internal types beyond `sum_tree`/`util`, which this workspace already vendors. Published as `boltz-rope`. | `src/rope.rs`, `src/chunk.rs` |
+| **language_core** | Minimal tree-sitter language registry + highlight-query runner (no LSP). Grammars are Cargo features: `lang-rust` (default), `lang-javascript`, `lang-typescript`, `lang-markdown`, `lang-json` — each opt-in to avoid paying binary size for unused languages. Published as `boltz-language-core`. | `src/language_core.rs`, `src/highlight.rs` |
+| **terminal** | Real PTY terminal session backed by the published `alacritty_terminal` crate (not GPUI-aware — no view/render code). Spawns the user's shell, exposes write/resize/read-screen-as-text/shutdown. macOS/Unix verified only; Linux/Windows untested in this environment. Published as `boltz-terminal`. | `src/terminal.rs` |
 
 #### Theme & Styling
 
 | Crate | Role | Key Files |
 |-------|------|-----------|
 | **theme** | Theme system: built-in fallback themes (One Dark), color palettes, UI density. Loaded via `theme::init()`. No on-disk theme files needed. | `LoadThemes::JustBase` for minimal theme bootstrap |
-| **syntax_theme** | Syntax highlighting theme definitions. | Color scheme for code/text rendering |
+| **syntax_theme** | Syntax highlighting theme definitions — capture-name → `HighlightStyle` map (Zed-standard capture names, e.g. `"keyword"`, `"string"`, `"type"`). `style_for_name` is an EXACT match only; dotted-prefix fallback (`"type.builtin"` → `"type"`) is the caller's job (see `ui`'s `code_editor.rs::style_for_capture`), not built into this crate. | Color scheme for code/text rendering |
 
 #### Font System
 
@@ -108,7 +116,11 @@ Platform backends (gpui_macos, gpui_linux, gpui_windows)
 ui
 ├── component, icons
 ├── gpui
-└── theme
+├── theme, syntax_theme
+├── language_core → rope, tree-sitter + grammar crates (feature-gated)
+└── terminal → alacritty_terminal (terminal has NO gpui dependency itself;
+                ui's TerminalView is the only place PTY output meets a
+                render tree)
 
 Component tree flow:
 app → gpui_platform → [gpui_macos | gpui_linux | gpui_windows] + wgpu/font_kit
@@ -174,3 +186,5 @@ Total: **1.38M tokens** across 515 files. Core GPUI window/element logic dominat
 - **Platform-agnostic first**: Isolate platform-specific code in backend crates; use `gpui_platform` facade in app code
 - **Features, not features gates**: Prefer runtime selection (e.g., `gpui_platform::application()`) over `#[cfg]`
 - **Monorepo discipline**: Interdependent crates are fine; cyclic dependencies are not
+- **`SyntaxTheme::style_for_name` is exact-match only**: it does NOT do dotted-prefix fallback (`"type.builtin"` does not automatically resolve to `"type"`) — that fallback is a separate method (`highlight_id`, returns an index not a style). Callers mapping tree-sitter capture names to colors need their own fallback (see `ui`'s `code_editor.rs::style_for_capture` for the pattern) or many captures will silently render uncolored.
+- **Not every OS-specific dependency needs the `gpui_platform` facade**: if the branching is entirely internal to a third-party crate (e.g. `alacritty_terminal::tty::new` handles forkpty/ConPTY internally with no `#[cfg]` exposed to callers), calling it directly from a platform-agnostic crate doesn't violate the "no `#[cfg(target_os)]` outside platform crates" rule — that rule is about code *this workspace* writes, not opaque dependency internals (same principle already applied to `wgpu`/`cosmic-text`).

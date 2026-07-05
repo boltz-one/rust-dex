@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/app",
     "examples/ui_gallery",
+    "crates/acp",
     "crates/collections",
     "crates/component",
     "crates/font_kit",
@@ -18,13 +19,16 @@ members = [
     "crates/gpui_windows",
     "crates/http_client",
     "crates/icons",
+    "crates/language_core",
     "crates/media",
     "crates/menu",
     "crates/refineable",
     "crates/refineable/derive_refineable",
+    "crates/rope",
     "crates/scheduler",
     "crates/sum_tree",
     "crates/syntax_theme",
+    "crates/terminal",
     "crates/theme",
     "crates/ui",
     "crates/ui_macros",
@@ -42,6 +46,7 @@ edition = "2024"
 repository = "https://github.com/boltz-one/rust-dex"
 
 [workspace.dependencies]
+acp = { path = "crates/acp", version = "0.1.0", package = "boltz-acp" }
 collections = { path = "crates/collections", version = "0.1.0", package = "boltz-collections" }
 component = { path = "crates/component", version = "0.1.0", package = "boltz-component" }
 derive_refineable = { path = "crates/refineable/derive_refineable", version = "0.1.0", package = "boltz-derive-refineable" }
@@ -58,12 +63,15 @@ gpui_windows = { path = "crates/gpui_windows", default-features = false, version
 gpui_util = { path = "crates/gpui_util", version = "0.1.0", package = "boltz-gpui-util" }
 http_client = { path = "crates/http_client", version = "0.1.0", package = "boltz-http-client" }
 icons = { path = "crates/icons", version = "0.1.0", package = "boltz-icons" }
+language_core = { path = "crates/language_core", version = "0.1.0", package = "boltz-language-core" }
 media = { path = "crates/media", version = "0.1.0", package = "boltz-media" }
 menu = { path = "crates/menu", version = "0.1.0", package = "boltz-menu" }
 refineable = { path = "crates/refineable", version = "0.1.0", package = "boltz-refineable" }
+rope = { path = "crates/rope", version = "0.1.0", package = "boltz-rope" }
 scheduler = { path = "crates/scheduler", version = "0.1.0", package = "boltz-scheduler" }
 sum_tree = { path = "crates/sum_tree", version = "0.1.0", package = "boltz-sum-tree" }
 syntax_theme = { path = "crates/syntax_theme", version = "0.1.0", package = "boltz-syntax-theme" }
+terminal = { path = "crates/terminal", version = "0.1.0", package = "boltz-terminal" }
 theme = { path = "crates/theme", version = "0.1.0", package = "boltz-theme" }
 ui = { path = "crates/ui", version = "0.1.0", package = "boltz-ui" }
 ui_macros = { path = "crates/ui_macros", version = "0.1.0", package = "boltz-ui-macros" }
@@ -72,6 +80,15 @@ util_macros = { path = "crates/util_macros", version = "0.1.0", package = "boltz
 logging = { path = "crates/logging", version = "0.1.0", package = "boltz-logging" }
 tracing_facade = { path = "crates/tracing_facade", version = "0.1.0", package = "boltz-tracing-facade" }
 tracing_facade_macros = { path = "crates/tracing_facade_macros", version = "0.1.0", package = "boltz-tracing-facade-macros" }
+agent-client-protocol = "=1.0.1"
+# Must stay in lockstep with the exact schema version agent-client-protocol 1.0.1
+# depends on (verified against the crates.io sparse index: agent-client-protocol
+# 1.0.1 requires agent-client-protocol-schema =1.1.0 exactly). Phase 1 pinned
+# =1.2.0, which does not exist as a dependency combination upstream ever
+# publishes together - corrected here in Phase 2 once the mismatch surfaced via
+# `cargo check`.
+agent-client-protocol-schema = "=1.1.0"
+alacritty_terminal = "0.25"
 anyhow = "1.0.86"
 ashpd = { version = "0.13", default-features = false, features = [
     "async-io",
@@ -168,8 +185,16 @@ take-until = "0.2.0"
 tempfile = "3.20.0"
 thiserror = "2.0.12"
 tracing = "0.1.40"
+tree-sitter = "0.26.9"
+tree-sitter-javascript = "0.25"
+tree-sitter-json = "0.24"
+tree-sitter-md = "0.5"
+tree-sitter-rust = "0.24.2"
+tree-sitter-typescript = "0.23"
 unicase = "2.6"
+unicode-segmentation = "1.10"
 url = "2.2"
+vte = { version = "0.15.0", features = ["ansi"] }
 uuid = { version = "1.1.2", features = ["v4", "v5", "v7", "serde"] }
 walkdir = "2.5"
 which = "6.0.0"
