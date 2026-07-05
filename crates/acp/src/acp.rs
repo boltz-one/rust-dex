@@ -18,6 +18,8 @@ pub mod error_shapes;
 pub mod filesystem;
 pub mod jsonrpc_gap;
 pub mod mcp_servers;
+#[cfg(feature = "perf-metrics")]
+pub mod perf_metrics;
 pub mod permissions;
 mod platform;
 pub mod queue;
