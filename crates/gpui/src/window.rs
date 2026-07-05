@@ -974,6 +974,7 @@ pub struct Window {
     pub(crate) text_style_stack: Vec<TextStyleRefinement>,
     pub(crate) rendered_entity_stack: Vec<EntityId>,
     pub(crate) element_offset_stack: Vec<Point<Pixels>>,
+    pub(crate) sticky_viewport_stack: Vec<Bounds<Pixels>>,
     pub(crate) element_opacity: f32,
     pub(crate) content_mask_stack: Vec<ContentMask<Pixels>>,
     pub(crate) requested_autoscroll: Option<Bounds<Pixels>>,
@@ -1589,6 +1590,7 @@ impl Window {
             text_style_stack: Vec::new(),
             rendered_entity_stack: Vec::new(),
             element_offset_stack: Vec::new(),
+            sticky_viewport_stack: Vec::new(),
             content_mask_stack: Vec::new(),
             element_opacity: 1.0,
             requested_autoscroll: None,
@@ -3054,6 +3056,30 @@ impl Window {
         self.element_offset_stack.push(offset);
         let result = f(self);
         self.element_offset_stack.pop();
+        result
+    }
+
+    /// Returns the visible viewport bounds of the nearest scrollable
+    /// ancestor pushed via [`Self::with_sticky_viewport`], if any. Used to
+    /// resolve `Position::Sticky` elements' clamped paint position.
+    pub fn sticky_viewport(&self) -> Option<Bounds<Pixels>> {
+        self.sticky_viewport_stack.last().copied()
+    }
+
+    /// Marks `viewport` (a scrollable container's own bounds, in window
+    /// space) as the nearest sticky-positioning reference for the duration
+    /// of `f`. Call this around prepainting/painting the children of any
+    /// element with `overflow: scroll`, so descendant `Position::Sticky`
+    /// elements can clamp against it. This method should only be called
+    /// during the prepaint or paint phase of element drawing.
+    pub fn with_sticky_viewport<R>(
+        &mut self,
+        viewport: Bounds<Pixels>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.sticky_viewport_stack.push(viewport);
+        let result = f(self);
+        self.sticky_viewport_stack.pop();
         result
     }
 

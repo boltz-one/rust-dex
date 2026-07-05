@@ -120,6 +120,16 @@ pub fn position_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
+        /// Sets the position of the element to `sticky`: laid out in normal
+        /// flow, but its origin is clamped to stay within its nearest
+        /// scrollable ancestor's viewport (offset by `top`/`left`/`right`/
+        /// `bottom` insets) once scrolled past.
+        /// [Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/position#sticky)
+        #visibility fn sticky(mut self) -> Self {
+            self.style().position = Some(gpui::Position::Sticky);
+            self
+        }
+
         #(#methods)*
     };
 

@@ -1199,6 +1199,17 @@ pub enum Position {
     ///
     /// WARNING: to opt-out of layouting entirely, you must use [`Display::None`] instead on your [`Style`] object.
     Absolute,
+    /// Laid out exactly like [`Position::Relative`] (space is reserved in
+    /// normal flow, sizing is unaffected), but at paint time the element's
+    /// origin is clamped so it stays within its nearest scrollable
+    /// ancestor's visible viewport, offset by [`Style::inset`] — mirroring
+    /// [CSS's `position: sticky`](https://developer.mozilla.org/en-US/docs/Web/CSS/position#sticky).
+    ///
+    /// Not a native Taffy concept: laid out as `Relative` for layout
+    /// purposes, then adjusted by GPUI itself during prepaint/paint (see
+    /// `Window::sticky_viewport` and `Interactivity::resolve_sticky_bounds`
+    /// in `elements/div.rs`).
+    Sticky,
 }
 
 impl From<AlignItems> for taffy::style::AlignItems {
@@ -1277,7 +1288,11 @@ impl From<Overflow> for taffy::style::Overflow {
 impl From<Position> for taffy::style::Position {
     fn from(value: Position) -> Self {
         match value {
-            Position::Relative => Self::Relative,
+            // Taffy has no native `sticky` concept — laid out exactly like
+            // `Relative` (space reserved in flow); GPUI applies the actual
+            // sticky clamping itself at paint time (see `Position::Sticky`'s
+            // doc comment).
+            Position::Relative | Position::Sticky => Self::Relative,
             Position::Absolute => Self::Absolute,
         }
     }

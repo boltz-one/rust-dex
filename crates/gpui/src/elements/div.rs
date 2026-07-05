@@ -17,14 +17,14 @@
 
 use crate::PinchEvent;
 use crate::{
-    Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, Bounds, ClickEvent, DispatchPhase,
-    Display, Element, ElementId, Entity, FocusHandle, Global, GlobalElementId, Hitbox,
-    HitboxBehavior, HitboxId, InspectorElementId, IntoElement, IsZero, KeyContext, KeyDownEvent,
-    KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId, ModifiersChangedEvent, MouseButton,
-    MouseClickEvent, MouseDownEvent, MouseMoveEvent, MousePressureEvent, MouseUpEvent, Overflow,
-    ParentElement, Pixels, Point, Render, ScrollWheelEvent, SharedString, Size, Style,
-    StyleRefinement, Styled, Task, TooltipId, Visibility, Window, WindowControlArea, point, px,
-    size,
+    AbsoluteLength, Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, Bounds, ClickEvent,
+    DispatchPhase, Display, Element, ElementId, Entity, FocusHandle, Global, GlobalElementId,
+    Hitbox, HitboxBehavior, HitboxId, InspectorElementId, IntoElement, IsZero, KeyContext,
+    KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId, Length,
+    ModifiersChangedEvent, MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent,
+    MousePressureEvent, MouseUpEvent, Overflow, ParentElement, Pixels, Point, Position, Render,
+    ScrollWheelEvent, SharedString, Size, Style, StyleRefinement, Styled, Task, TooltipId,
+    Visibility, Window, WindowControlArea, point, px, size,
 };
 use collections::HashMap;
 use gpui_util::ResultExt;
@@ -1837,6 +1837,7 @@ impl Interactivity {
                 let mut element_state =
                     element_state.map(|element_state| element_state.unwrap_or_default());
                 let style = self.compute_style_internal(None, element_state.as_mut(), window, cx);
+                let bounds = Self::resolve_sticky_bounds(bounds, &style, window);
 
                 if let Some(element_state) = element_state.as_mut() {
                     if let Some(clicked_state) = element_state.clicked_state.as_ref() {
@@ -1870,7 +1871,13 @@ impl Interactivity {
 
                             let scroll_offset =
                                 self.clamp_scroll_position(bounds, &style, window, cx);
-                            let result = f(&style, scroll_offset, hitbox, window, cx);
+                            let result = if self.scroll_offset.is_some() {
+                                window.with_sticky_viewport(bounds, |window| {
+                                    f(&style, scroll_offset, hitbox, window, cx)
+                                })
+                            } else {
+                                f(&style, scroll_offset, hitbox, window, cx)
+                            };
                             (result, element_state)
                         },
                     )
@@ -1901,6 +1908,57 @@ impl Interactivity {
             || !self.drop_listeners.is_empty()
             || self.tooltip_builder.is_some()
             || window.is_inspector_picking(cx)
+    }
+
+    /// Implements `Position::Sticky`: if `style.position` is `Sticky` and
+    /// there's a tracked scrollable ancestor (see `Window::sticky_viewport`),
+    /// clamps `bounds`' origin so it doesn't scroll past that ancestor's
+    /// visible viewport on whichever edges have an explicit (non-`Auto`)
+    /// `inset` — mirroring CSS `position: sticky`'s `top`/`right`/`bottom`/
+    /// `left`. No-op for any other position, or when no scrollable ancestor
+    /// is being tracked.
+    ///
+    /// Percentage insets resolve against this element's own bounds rather
+    /// than its containing block's (unlike CSS) — an accepted simplification
+    /// since sticky offsets are overwhelmingly fixed pixel/rem values in
+    /// practice.
+    fn resolve_sticky_bounds(
+        bounds: Bounds<Pixels>,
+        style: &Style,
+        window: &Window,
+    ) -> Bounds<Pixels> {
+        if style.position != Position::Sticky {
+            return bounds;
+        }
+        let Some(viewport) = window.sticky_viewport() else {
+            return bounds;
+        };
+
+        let rem_size = window.rem_size();
+        let width = AbsoluteLength::Pixels(bounds.size.width);
+        let height = AbsoluteLength::Pixels(bounds.size.height);
+        let mut result = bounds;
+
+        if let Length::Definite(top) = style.inset.top {
+            let top = top.to_pixels(height, rem_size);
+            result.origin.y = result.origin.y.max(viewport.origin.y + top);
+        }
+        if let Length::Definite(left) = style.inset.left {
+            let left = left.to_pixels(width, rem_size);
+            result.origin.x = result.origin.x.max(viewport.origin.x + left);
+        }
+        if let Length::Definite(bottom) = style.inset.bottom {
+            let bottom = bottom.to_pixels(height, rem_size);
+            let max_y = viewport.origin.y + viewport.size.height - bottom - bounds.size.height;
+            result.origin.y = result.origin.y.min(max_y);
+        }
+        if let Length::Definite(right) = style.inset.right {
+            let right = right.to_pixels(width, rem_size);
+            let max_x = viewport.origin.x + viewport.size.width - right - bounds.size.width;
+            result.origin.x = result.origin.x.min(max_x);
+        }
+
+        result
     }
 
     fn clamp_scroll_position(
@@ -1987,6 +2045,7 @@ impl Interactivity {
                     element_state.map(|element_state| element_state.unwrap_or_default());
 
                 let style = self.compute_style_internal(hitbox, element_state.as_mut(), window, cx);
+                let bounds = Self::resolve_sticky_bounds(bounds, &style, window);
 
                 #[cfg(any(feature = "test-support", test))]
                 if let Some(debug_selector) = &self.debug_selector {
@@ -2054,7 +2113,13 @@ impl Interactivity {
                                         }
 
                                         self.paint_keyboard_listeners(window, cx);
-                                        f(&style, window, cx);
+                                        if self.scroll_offset.is_some() {
+                                            window.with_sticky_viewport(bounds, |window| {
+                                                f(&style, window, cx);
+                                            });
+                                        } else {
+                                            f(&style, window, cx);
+                                        }
 
                                         if let Some(_hitbox) = hitbox {
                                             #[cfg(any(feature = "inspector", debug_assertions))]
