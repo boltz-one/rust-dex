@@ -123,24 +123,25 @@ gpui_platform → gpui_macos | gpui_linux | gpui_windows (PTY impl thật, nếu
 
 ## Todo list
 
-- [ ] Xác minh alacritty_terminal's Pty API thật (ADR mục 3) trước khi code
-- [ ] Pin version `alacritty_terminal`/`vte`/`async-channel` (đối chiếu Zed's lockfile)
-- [ ] `crates/terminal/` core PTY+VT100, KHÔNG chứa `#[cfg(target_os)]`
-- [ ] Facade fn trong `gpui_platform` (+ backend impl nếu cần)
-- [ ] Async I/O bridge qua `cx.background_executor()`
-- [ ] `terminal_view.rs` render buffer thật
-- [ ] Resize signaling nối với `ResizablePanelGroup`
-- [ ] Test thủ công macOS + Linux + Windows (ghi lại kết quả từng platform)
-- [ ] `make fmt-check && make check-all` pass
+- [x] Xác minh alacritty_terminal's Pty API thật (ADR mục 3) trước khi code — dùng bản publish crates.io 0.25.1, không phải Zed's fork; `tty::new()` tự đóng gói platform logic, không cần facade riêng (xem ADR mục 3 cập nhật ở "Ghi chú triển khai thực tế").
+- [x] Pin version `alacritty_terminal`/`vte`/`async-channel` — `alacritty_terminal = "0.25"`, `vte = "0.15.0"` (đã có sẵn từ trước), `async-channel = "2.5.0"` (đã có sẵn).
+- [x] `crates/terminal/` core PTY+VT100, KHÔNG chứa `#[cfg(target_os)]` — xác nhận đúng.
+- [x] ~~Facade fn trong `gpui_platform`~~ — KHÔNG cần, xem phát hiện trong "Ghi chú triển khai thực tế".
+- [x] Async I/O bridge — dùng `cx.spawn` + `async_channel::Receiver` (pattern có sẵn từ `toast_stack.rs`), không cần `cx.background_executor()` trực tiếp vì `EventLoop::spawn()` của alacritty_terminal đã tự chạy OS thread riêng.
+- [x] `terminal_view.rs` render buffer thật — có màu ANSI per-cell thật (vòng 2).
+- [x] Resize signaling nối với pane thật — nối với `TerminalView`'s container bounds đo qua `canvas` (vòng 2). Không nối trực tiếp `ResizablePanelGroup`'s `on_drag_move` như đề xuất ban đầu vì `PaneGroup` (Phase A, không phải `ResizablePanelGroup`) là component thực tế bọc `TerminalView` — đo bounds tại chính `TerminalView` đơn giản hơn và không cần `PaneGroup` biết gì về terminal.
+- [ ] Test thủ công macOS + Linux + Windows — chỉ macOS đã test (xem giới hạn ghi ở Success Criteria).
+- [x] `make fmt-check && make check-all` pass (scoped cho crate của mình — `make check-all` toàn workspace hiện bị chặn bởi crate `acp` dở dang của session khác, không liên quan).
 
 ## Success Criteria
 
 - [x] Không một dòng `#[cfg(target_os)]` nào xuất hiện ngoài `gpui_platform`/`gpui_macos`/`gpui_linux`/`gpui_windows` — xác nhận: `crates/terminal` không viết `#[cfg(target_os)]` nào (branching nằm trong `alacritty_terminal`, xem ghi chú triển khai).
 - [x] (macOS/Unix only) Terminal panel spawn được shell thật (`$SHELL` trên Unix), nhận input, hiển thị output không crash — verified qua test thật + chạy `ui_gallery` thật.
 - [ ] (Windows) `cmd.exe`/PowerShell — **CHƯA verify**, không có máy Windows trong phiên này.
-- [ ] Resize theo panel — **CHƯA nối dây thật**, `Terminal::resize()` tồn tại và hoạt động độc lập nhưng `TerminalView` hiện dùng grid cố định 24x80, chưa gọi resize khi `PaneGroup` co giãn.
-- [x] Đóng panel/app không leak PTY process — verified bằng `ps` thật trước/sau khi đóng `ui_gallery`: process `/bin/zsh` con biến mất sau khi app đóng.
-- [ ] Verified thủ công trên ít nhất macOS + 1 platform khác — **CHƯA đạt**, chỉ macOS được test. Theo đúng tiêu chí gốc của mục này, phase KHÔNG được coi là "hoàn thành" đầy đủ tới chuẩn merge ban đầu đề ra — chỉ Unix/macOS path có bằng chứng thực tế.
+- [x] **Resize theo panel — Đã nối dây thật (vòng 2, cùng ngày).** `TerminalView` đo pixel bounds thật của container qua `canvas` (cùng pattern one-frame-lag `PaneGroup`/`ResizablePanelGroup` đã dùng), quy đổi ra rows/columns qua `CELL_WIDTH`/`CELL_HEIGHT` xấp xỉ, chỉ gọi `Terminal::resize()` khi kích thước thực sự đổi (tránh gửi resize mỗi frame). Test thật `resize_changes_reported_size_and_real_grid_dimensions` xác nhận cả `current_size()` lẫn `grid.screen_lines()` thật đều đổi theo — không chỉ field ghi sổ.
+- [x] Đóng panel/app không leak PTY process — verified bằng `ps` thật trước/sau khi đóng `ui_gallery`: process `/bin/zsh` con biến mất sau khi app đóng (verify lại lần 2 sau khi thêm resize/màu, vẫn đúng).
+- [x] **Màu ANSI per-cell thật (vòng 2, cùng ngày, không có trong tiêu chí gốc nhưng đáng ghi nhận).** `Terminal::screen_cells()` trả `TerminalCell{text, fg, bg, bold, italic, underline}` resolve từ grid thật (16 named color + 256-color cube/grayscale theo đúng công thức ANSI chuẩn), `TerminalView` render qua `StyledText::with_highlights` (tái dùng đúng pattern `code_editor.rs`). Test end-to-end thật: in `\033[31mZ\033[0m` qua shell thật, xác nhận cell 'Z' đọc lại có fg = đỏ. Phát hiện + fix trong lúc viết test: PTY echo dòng lệnh gõ vào (chưa tô màu) xuất hiện TRƯỚC output thật — test ban đầu match nhầm ký tự echo, đã sửa bằng cách lọc thêm `fg.is_some()`.
+- [ ] Verified thủ công trên ít nhất macOS + 1 platform khác — **CHƯA đạt, không đổi so với vòng 1**. Chỉ macOS được test. Theo đúng tiêu chí gốc của mục này, phase KHÔNG được coi là "hoàn thành" đầy đủ tới chuẩn merge ban đầu đề ra — chỉ Unix/macOS path có bằng chứng thực tế. Đây là giới hạn thật của môi trường phiên này, không phải việc còn thiếu do chưa làm.
 
 ## Risk Assessment
 
