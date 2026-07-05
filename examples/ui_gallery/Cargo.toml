@@ -15,6 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 component.workspace = true
+fonts_ibm_plex.workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true
 icons.workspace = true
