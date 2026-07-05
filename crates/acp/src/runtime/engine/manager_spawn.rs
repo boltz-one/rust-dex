@@ -34,13 +34,28 @@ pub(super) async fn spawn_connected_session(
     resume_policy: SessionResumePolicy,
 ) -> Result<Arc<ConnectedSession>, AcpRuntimeError> {
     let agent_command = record.agent_command.clone();
-    let parts = resolve_agent_program(&agent_command, None).map_err(|err| {
+    let mut parts = resolve_agent_program(&agent_command, None).map_err(|err| {
         wrap_err(
             AcpRuntimeErrorCode::BackendMissing,
             "failed to resolve agent command",
             err,
         )
     })?;
+    parts.args =
+        crate::agent_command::resolve_gemini_command_args(&parts.command, &parts.args).await;
+    let is_gemini = crate::agent_command::is_gemini_acp_command(&parts.command, &parts.args);
+    let is_devin = crate::agent_command::is_devin_acp_command(&parts.command, &parts.args);
+    if crate::agent_command::is_copilot_acp_command(&parts.command, &parts.args) {
+        crate::agent_command::ensure_copilot_acp_support(&parts.command)
+            .await
+            .map_err(|err| {
+                wrap_err(
+                    AcpRuntimeErrorCode::BackendUnsupportedControl,
+                    "copilot ACP stdio mode unsupported",
+                    err,
+                )
+            })?;
+    }
     let cwd = PathBuf::from(&record.cwd);
     let session_env = session_options_from_record(&record).and_then(|o| o.env);
     let env = build_agent_environment(std::env::vars(), None, session_env.as_ref(), cfg!(windows));
@@ -86,6 +101,8 @@ pub(super) async fn spawn_connected_session(
         env: &env,
         client_name: "boltz-acp".to_string(),
         terminal: options.terminal,
+        is_gemini,
+        is_devin,
         handlers,
     })
     .await

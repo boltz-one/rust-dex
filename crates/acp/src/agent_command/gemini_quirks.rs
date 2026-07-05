@@ -132,7 +132,9 @@ pub async fn build_gemini_acp_startup_timeout_message(command: &str) -> String {
 
     if std::env::var_os("GEMINI_API_KEY").is_none() && std::env::var_os("GOOGLE_API_KEY").is_none()
     {
-        parts.push("No GEMINI_API_KEY or GOOGLE_API_KEY was set for non-interactive auth.".to_string());
+        parts.push(
+            "No GEMINI_API_KEY or GOOGLE_API_KEY was set for non-interactive auth.".to_string(),
+        );
     }
 
     parts.push(
@@ -160,9 +162,18 @@ mod tests {
 
     #[test]
     fn compares_versions_lexicographically() {
-        assert_eq!(compare_version_parts((0, 32, 9), (0, 33, 0)), Ordering::Less);
-        assert_eq!(compare_version_parts((0, 33, 0), (0, 33, 0)), Ordering::Equal);
-        assert_eq!(compare_version_parts((1, 0, 0), (0, 33, 0)), Ordering::Greater);
+        assert_eq!(
+            compare_version_parts((0, 32, 9), (0, 33, 0)),
+            Ordering::Less
+        );
+        assert_eq!(
+            compare_version_parts((0, 33, 0), (0, 33, 0)),
+            Ordering::Equal
+        );
+        assert_eq!(
+            compare_version_parts((1, 0, 0), (0, 33, 0)),
+            Ordering::Greater
+        );
     }
 
     #[test]
@@ -193,8 +204,12 @@ mod tests {
     fn non_gemini_command_skips_probe_entirely() {
         smol::block_on(async {
             let args = vec!["--acp".to_string()];
-            let resolved = resolve_gemini_command_args("/definitely/not/a/real/binary-xyz", &args).await;
-            assert_eq!(resolved, args, "non-gemini basename must pass through unchanged");
+            let resolved =
+                resolve_gemini_command_args("/definitely/not/a/real/binary-xyz", &args).await;
+            assert_eq!(
+                resolved, args,
+                "non-gemini basename must pass through unchanged"
+            );
         });
     }
 
@@ -219,8 +234,7 @@ mod tests {
             let script = write_fake_gemini(&dir, "0.30.5\n");
 
             let resolved =
-                resolve_gemini_command_args(script.to_str().unwrap(), &["--acp".to_string()])
-                    .await;
+                resolve_gemini_command_args(script.to_str().unwrap(), &["--acp".to_string()]).await;
             assert_eq!(resolved, vec!["--experimental-acp".to_string()]);
         });
     }
@@ -233,8 +247,7 @@ mod tests {
             let script = write_fake_gemini(&dir, "0.33.0\n");
 
             let resolved =
-                resolve_gemini_command_args(script.to_str().unwrap(), &["--acp".to_string()])
-                    .await;
+                resolve_gemini_command_args(script.to_str().unwrap(), &["--acp".to_string()]).await;
             assert_eq!(resolved, vec!["--acp".to_string()]);
         });
     }
@@ -246,7 +259,9 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let script = write_fake_gemini(&dir, "1.2.3\n");
 
-            let version = detect_gemini_version(script.to_str().unwrap()).await.unwrap();
+            let version = detect_gemini_version(script.to_str().unwrap())
+                .await
+                .unwrap();
             assert_eq!(version.parts, (1, 2, 3));
         });
     }

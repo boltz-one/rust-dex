@@ -9,6 +9,11 @@
 //! - `ACP_FAKE_AGENT_IGNORE_SIGTERM=1`: installs a `SIG_IGN` handler for
 //!   SIGTERM before serving, so the SIGTERM->SIGKILL escalation test can
 //!   observe the escalation actually happening.
+//! - `ACP_FAKE_AGENT_INITIALIZE_DELAY_MS=<n>`: sleeps `n` milliseconds on
+//!   the request-serving thread before responding to `initialize`. Used by
+//!   `client_lifecycle.rs`'s Gemini-startup-timeout test to force a real
+//!   `AcpClient::spawn` call past `resolve_gemini_acp_startup_timeout_ms`'s
+//!   budget without an actual slow Gemini CLI installed.
 //! - `ACP_FAKE_AGENT_EXIT_AFTER_MS=<n>`: exits the process (simulating a
 //!   crash, no graceful shutdown) `n` milliseconds after startup. Set via
 //!   `AcpRuntimeEnsureInput.session_options.env` (persisted onto the
@@ -107,6 +112,14 @@ fn handle_message(request: &Value, stdout: &Mutex<std::io::Stdout>) {
     };
     let id = request.get("id").cloned();
 
+    if method == "initialize" {
+        if let Ok(ms) = std::env::var("ACP_FAKE_AGENT_INITIALIZE_DELAY_MS") {
+            if let Ok(ms) = ms.parse::<u64>() {
+                std::thread::sleep(std::time::Duration::from_millis(ms));
+            }
+        }
+    }
+
     if method == "session/prompt" {
         let session_id = request
             .get("params")
@@ -151,16 +164,31 @@ fn handle_message(request: &Value, stdout: &Mutex<std::io::Stdout>) {
     };
 
     let result = match method {
-        "initialize" => json!({
-            "protocolVersion": 1,
-            "agentCapabilities": {
-                "loadSession": false,
-                "sessionCapabilities": {
-                    "resume": {},
+        // Echoes the request's `clientInfo`/`clientCapabilities` back
+        // under `_meta` (a reserved, implementation-defined field per ACP)
+        // so integration tests can assert what this crate actually
+        // advertised — used by `client_lifecycle.rs`'s Devin
+        // identity-spoofing test.
+        "initialize" => {
+            let params = request.get("params").cloned().unwrap_or(json!({}));
+            json!({
+                "protocolVersion": 1,
+                "agentCapabilities": {
+                    "loadSession": false,
+                    "sessionCapabilities": {
+                        "resume": {},
+                    },
                 },
-            },
-            "authMethods": [],
-        }),
+                "authMethods": [],
+                "_meta": {
+                    "echoClientInfo": params.get("clientInfo").cloned().unwrap_or(Value::Null),
+                    "echoClientCapabilities": params
+                        .get("clientCapabilities")
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                },
+            })
+        }
         "session/new" => json!({
             "sessionId": format!("fake-session-{}", std::process::id()),
         }),
