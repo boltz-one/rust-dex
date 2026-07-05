@@ -52,6 +52,7 @@ PACKAGES=(
   boltz-gpui
   boltz-syntax-theme
   boltz-icons
+  boltz-fonts-ibm-plex
   boltz-menu
   boltz-ui-macros
   boltz-gpui-wgpu

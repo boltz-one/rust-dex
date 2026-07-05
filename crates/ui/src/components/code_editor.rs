@@ -3,19 +3,19 @@ use gpui::{AnyElement, Context, Entity, Render, rgb};
 use crate::prelude::*;
 use crate::TextInput;
 
-/// The mockup's fixed line-number gutter width.
+/// Fixed line-number gutter width.
 const GUTTER_WIDTH: Pixels = px(44.);
-/// Matches the mockup's `font-family:'IBM Plex Mono'`.
+/// Monospace font used for code content.
 const CODE_FONT_FAMILY: &str = "IBM Plex Mono";
-/// Matches the mockup's `font-size:12.5px`.
+/// Code text size.
 const CODE_FONT_SIZE: Pixels = px(12.5);
-/// Matches the mockup's `line-height:1.7`.
+/// Code line height (relative).
 const CODE_LINE_HEIGHT: f32 = 1.7;
 
 /// A multi-line code area with a line-number gutter, composed from a
-/// multiline `TextInput` (no syntax highlighting — see Phase 02 ADR
-/// Rationale: highlighting is a materially larger, separately-scoped
-/// effort).
+/// multiline `TextInput`. No syntax highlighting — full highlighting
+/// (grammar integration, incremental parsing, theme mapping) is a
+/// materially larger, separately-scoped effort.
 ///
 /// Stateful view — create with `cx.new(|cx| CodeEditor::new(cx))` and store
 /// the resulting `Entity<CodeEditor>`.
@@ -30,8 +30,8 @@ impl CodeEditor {
         Self { input }
     }
 
-    /// Toggles read-only mode (used by the Scripts tab's read-only code
-    /// preview, which reuses this component rather than a second one).
+    /// Toggles read-only mode (e.g. for a read-only code preview that reuses
+    /// this component rather than a separate one).
     /// Forwards the flag to the wrapped `TextInput` — no key-handling logic
     /// is duplicated here; the `TextInput`'s own `read_only` flag remains the
     /// single source of truth.
@@ -51,8 +51,8 @@ impl CodeEditor {
         self.input.read(cx).text().to_string()
     }
 
-    /// Programmatically sets the code content (e.g. loading a mock script
-    /// into a read-only preview).
+    /// Programmatically sets the code content (e.g. loading content into a
+    /// read-only preview).
     pub fn set_text(&mut self, text: impl Into<String>, cx: &mut Context<Self>) {
         self.input.update(cx, |input, cx| input.set_text(text, cx));
         cx.notify();
@@ -68,7 +68,7 @@ impl Render for CodeEditor {
             .w(GUTTER_WIDTH)
             .pr(px(16.))
             .text_right()
-            // Gutter line-number text color from the mockup (`#3A424E`).
+            // Gutter line-number text color.
             .text_color(rgb(0x3A424E))
             .font_family(CODE_FONT_FAMILY)
             .text_size(CODE_FONT_SIZE)
@@ -85,7 +85,7 @@ impl Render for CodeEditor {
                 div()
                     .flex_1()
                     .min_w_0()
-                    // Code text color from the mockup (`#B7BEC7`).
+                    // Code text color.
                     .text_color(rgb(0xB7BEC7))
                     .font_family(CODE_FONT_FAMILY)
                     .text_size(CODE_FONT_SIZE)

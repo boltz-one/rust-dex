@@ -28,7 +28,8 @@ pub use crate::traits::visible_on_hover::*;
 pub use crate::{
     ActionPanel, Alert, AlertDialog, AppShell, AspectRatio, Badge, BadgeColor, BadgeVariant,
     Breadcrumb, BreadcrumbItem, CalendarPreview, Card, CardVariant, CarouselPreview, Chart,
-    ChartKind, Checkbox, CodeEditor, Combobox, Command, CommandItem, CommandPalette, Container,
+    ChartKind, Checkbox, CodeEditor, Combobox, Command, CommandPalette, CommandPaletteItem,
+    Container,
     DatePickerPreview, DescriptionList, DescriptionListMode, Drawer, EmptyState, Feed, FileInput,
     Form, FormField, HoverCard, InputGroup, InputOtp, Item, Kbd, LayoutTable, LayoutTableBody,
     LayoutTableCaption, LayoutTableCell, LayoutTableFooter, LayoutTableHead, LayoutTableHeader,

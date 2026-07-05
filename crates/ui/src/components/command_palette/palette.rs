@@ -9,12 +9,11 @@ use crate::{IconName, List, ListItem, TextInput, prelude::*};
 
 use super::fuzzy::score;
 
-/// Default panel width for a [`CommandPalette`] (matches the mockup's
-/// 600px-wide overlay).
+/// Default panel width for a [`CommandPalette`] overlay.
 pub const COMMAND_PALETTE_WIDTH: Pixels = px(600.);
 
 /// A single entry rendered in a [`CommandPalette`]'s results list.
-pub struct CommandItem {
+pub struct CommandPaletteItem {
     label: SharedString,
     subtitle: Option<SharedString>,
     icon: Option<IconName>,
@@ -22,7 +21,7 @@ pub struct CommandItem {
     on_select: Rc<dyn Fn(&mut Window, &mut App)>,
 }
 
-impl CommandItem {
+impl CommandPaletteItem {
     pub fn new(
         label: impl Into<SharedString>,
         on_select: impl Fn(&mut Window, &mut App) + 'static,
@@ -53,17 +52,17 @@ impl CommandItem {
 }
 
 /// A searchable, keyboard-driven command overlay: a text input with a live
-/// fuzzy-filtered list of [`CommandItem`]s. ↑/↓ move the highlighted row,
+/// fuzzy-filtered list of [`CommandPaletteItem`]s. ↑/↓ move the highlighted row,
 /// Enter runs it, Esc requests dismissal via [`CommandPalette::on_dismiss`].
 ///
 /// `crate::Modal` intentionally renders no backdrop/centering of its own
 /// (callers supply that, same as `crate::Drawer`'s convention) — so
 /// `CommandPalette` supplies its own backdrop + centered panel wrapper here
-/// rather than duplicating logic `Modal` doesn't have. The panel needs exact,
-/// non-theme-driven mockup colors (`#12161C`/`#2A313B`/etc.), which is why it
-/// doesn't call `Modal::new()` directly (that would pull in `Modal`'s
-/// theme-driven `bg`/`border`/`radius`, which can't be overridden from
-/// outside); it still reuses the same header/list conventions.
+/// rather than duplicating logic `Modal` doesn't have. The panel uses fixed,
+/// non-theme-driven colors, which is why it doesn't call `Modal::new()`
+/// directly (that would pull in `Modal`'s theme-driven `bg`/`border`/`radius`,
+/// which can't be overridden from outside); it still reuses the same
+/// header/list conventions.
 ///
 /// Caller-owned open/closed state: like `Modal`/`Drawer`, there is no
 /// internal open flag. The caller mounts a `CommandPalette` into the tree
@@ -71,13 +70,13 @@ impl CommandItem {
 /// unmount it again.
 pub struct CommandPalette {
     query_input: Entity<TextInput>,
-    items: Vec<CommandItem>,
+    items: Vec<CommandPaletteItem>,
     selected_ix: usize,
     on_dismiss: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
 }
 
 impl CommandPalette {
-    pub fn new(cx: &mut Context<Self>, items: Vec<CommandItem>) -> Self {
+    pub fn new(cx: &mut Context<Self>, items: Vec<CommandPaletteItem>) -> Self {
         let query_input =
             cx.new(|cx| TextInput::new(cx).placeholder("Type a command or search…"));
 
