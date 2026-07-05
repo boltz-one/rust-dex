@@ -26,7 +26,7 @@ use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     ClientCapabilities, CreateTerminalRequest, CreateTerminalResponse, FileSystemCapabilities,
     Implementation, InitializeRequest, InitializeResponse, KillTerminalRequest,
-    KillTerminalResponse, ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest,
+    KillTerminalResponse, Meta, ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest,
     ReleaseTerminalResponse, RequestPermissionRequest, RequestPermissionResponse,
     SessionNotification, TerminalOutputRequest, TerminalOutputResponse, WaitForTerminalExitRequest,
     WaitForTerminalExitResponse, WriteTextFileRequest, WriteTextFileResponse,
@@ -39,6 +39,19 @@ use super::transport::AgentByteStreams;
 use crate::error::{AcpError, Result};
 use crate::version::crate_version;
 
+/// Ports `DEVIN_COMPATIBILITY_CLIENT_NAME`: Devin's server-side ACP
+/// precondition only passes for a recognized Windsurf IDE client identity,
+/// so this crate reports itself as Windsurf (not its real name/version)
+/// when talking to a Devin ACP agent. A documented interop workaround (see
+/// `others/acpx/src/acp/client.ts`), not a security concern.
+const DEVIN_COMPATIBILITY_CLIENT_NAME: &str = "windsurf";
+
+/// Ports `DEFAULT_DEVIN_COMPATIBILITY_CLIENT_VERSION`: the embedded
+/// Windsurf IDE version bundled with Devin Desktop 3.1.7, the first
+/// version acpx locally verified passes Devin's server-side ACP
+/// precondition. Overridable via `ACPX_DEVIN_WINDSURF_VERSION`.
+const DEFAULT_DEVIN_COMPATIBILITY_CLIENT_VERSION: &str = "1.110.1";
+
 /// A running background connection: the live request-sending handle plus
 /// the join handle for the `connect_with` task and the signal to stop it.
 pub struct RunningConnection {
@@ -48,12 +61,57 @@ pub struct RunningConnection {
     pub shutdown_tx: oneshot::Sender<()>,
 }
 
-fn client_capabilities(terminal: bool) -> ClientCapabilities {
-    ClientCapabilities::new()
+/// Ports `resolveClientCapabilities`: advertises this crate's real
+/// fs/terminal capabilities, plus (when `is_devin`) the
+/// `cognition.ai/requestDiagnostics` `_meta` flag Devin's ACP agent expects
+/// from a Windsurf-identified client.
+fn client_capabilities(terminal: bool, is_devin: bool) -> ClientCapabilities {
+    let base = ClientCapabilities::new()
         .fs(FileSystemCapabilities::new()
             .read_text_file(true)
             .write_text_file(true))
-        .terminal(terminal)
+        .terminal(terminal);
+    if is_devin {
+        base.meta(devin_client_capabilities_meta())
+    } else {
+        base
+    }
+}
+
+fn devin_client_capabilities_meta() -> Meta {
+    let mut meta = Meta::new();
+    meta.insert(
+        "cognition.ai/requestDiagnostics".to_string(),
+        serde_json::Value::Bool(true),
+    );
+    meta
+}
+
+/// Ports `resolveClientInfo`: reports this crate's real identity, unless
+/// talking to a Devin agent (see [`DEVIN_COMPATIBILITY_CLIENT_NAME`]'s
+/// docs above).
+fn client_info(client_name: String, is_devin: bool) -> Implementation {
+    if is_devin {
+        Implementation::new(
+            DEVIN_COMPATIBILITY_CLIENT_NAME,
+            resolve_devin_windsurf_version(),
+        )
+    } else {
+        Implementation::new(client_name, crate_version())
+    }
+}
+
+fn resolve_devin_windsurf_version() -> String {
+    resolve_devin_windsurf_version_from(
+        std::env::var("ACPX_DEVIN_WINDSURF_VERSION").ok().as_deref(),
+    )
+}
+
+fn resolve_devin_windsurf_version_from(raw: Option<&str>) -> String {
+    raw.map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_DEVIN_COMPATIBILITY_CLIENT_VERSION)
+        .to_string()
 }
 
 /// Converts this crate's [`AcpError`] into the wire-level
@@ -67,11 +125,14 @@ fn rpc_error_from(err: &AcpError) -> AcpRpcError {
 /// connection running in the background. `client_name` is this crate's
 /// advertised `clientInfo.name` (e.g. `"boltz-acp"` or an app-provided
 /// override); `terminal` advertises `terminal/*` capability support;
+/// `is_devin` swaps the advertised `clientInfo`/`clientCapabilities` for
+/// Devin's Windsurf compatibility identity (see this module's docs above);
 /// `handlers` wires up the agent-initiated RPCs (see module docs).
 pub async fn spawn_and_initialize(
     transport: AgentByteStreams,
     client_name: String,
     terminal: bool,
+    is_devin: bool,
     handlers: ClientRequestHandlers,
 ) -> Result<RunningConnection> {
     let (ready_tx, ready_rx) = oneshot::channel::<
@@ -328,8 +389,8 @@ pub async fn spawn_and_initialize(
             )
             .connect_with(transport, async move |cx: ConnectionTo<Agent>| {
                 let request = InitializeRequest::new(ProtocolVersion::LATEST)
-                    .client_capabilities(client_capabilities(terminal))
-                    .client_info(Implementation::new(client_name, crate_version()));
+                    .client_capabilities(client_capabilities(terminal, is_devin))
+                    .client_info(client_info(client_name, is_devin));
 
                 match cx.send_request(request).block_task().await {
                     Ok(response) => {
@@ -390,15 +451,57 @@ mod tests {
 
     #[test]
     fn client_capabilities_advertise_fs_and_terminal() {
-        let caps = client_capabilities(true);
+        let caps = client_capabilities(true, false);
         assert!(caps.fs.read_text_file);
         assert!(caps.fs.write_text_file);
         assert!(caps.terminal);
+        assert!(caps.meta.is_none());
     }
 
     #[test]
     fn client_capabilities_can_omit_terminal() {
-        let caps = client_capabilities(false);
+        let caps = client_capabilities(false, false);
         assert!(!caps.terminal);
+    }
+
+    #[test]
+    fn devin_client_capabilities_advertise_request_diagnostics_meta() {
+        let caps = client_capabilities(true, true);
+        let meta = caps.meta.expect("devin capabilities must carry _meta");
+        assert_eq!(
+            meta.get("cognition.ai/requestDiagnostics"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn client_info_reports_real_identity_by_default() {
+        let info = client_info("boltz-acp".to_string(), false);
+        assert_eq!(info.name, "boltz-acp");
+        assert_eq!(info.version, crate_version());
+    }
+
+    #[test]
+    fn client_info_spoofs_windsurf_identity_for_devin() {
+        let info = client_info("boltz-acp".to_string(), true);
+        assert_eq!(info.name, DEVIN_COMPATIBILITY_CLIENT_NAME);
+        assert_eq!(info.version, DEFAULT_DEVIN_COMPATIBILITY_CLIENT_VERSION);
+    }
+
+    #[test]
+    fn devin_windsurf_version_defaults_when_env_unset_or_blank() {
+        assert_eq!(
+            resolve_devin_windsurf_version_from(None),
+            DEFAULT_DEVIN_COMPATIBILITY_CLIENT_VERSION
+        );
+        assert_eq!(
+            resolve_devin_windsurf_version_from(Some("   ")),
+            DEFAULT_DEVIN_COMPATIBILITY_CLIENT_VERSION
+        );
+    }
+
+    #[test]
+    fn devin_windsurf_version_honors_env_override() {
+        assert_eq!(resolve_devin_windsurf_version_from(Some("2.0.0")), "2.0.0");
     }
 }

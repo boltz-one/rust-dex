@@ -7,16 +7,30 @@
 //! Per the phase's open question on agent-specific coverage: Claude, Cursor,
 //! and Codex detection/quirks are ported (acpx has dedicated compat files
 //! for these three). Gemini, Copilot, and Devin detection predicates are
-//! ported (cheap and needed for command classification), but their
-//! additional runtime quirks (Gemini CLI version probing and
-//! `--acp`/`--experimental-acp` rewriting, Copilot `--help` capability
-//! probing, Devin's Windsurf client-identity spoofing) are deferred — they
-//! require spawning an extra probe subprocess or a compatibility shim that
-//! doesn't affect this phase's handshake/shutdown/registry surface.
+//! ported (cheap and needed for command classification). Their additional
+//! runtime quirks are now also ported, in per-agent modules matching this
+//! directory's one-file-per-concern style:
+//!
+//! - [`gemini_quirks`]: `--version` probing and the
+//!   `--acp`/`--experimental-acp` rewrite for pre-0.33 Gemini CLI releases,
+//!   plus the startup-timeout duration/message used by
+//!   `client::AcpClient::spawn` and [`crate::error::AcpError::GeminiAcpStartupTimeout`].
+//! - [`copilot_quirks`]: the `--help` capability pre-flight check raised as
+//!   [`crate::error::AcpError::CopilotAcpUnsupported`].
+//! - Devin's Windsurf client-identity spoofing is a connection-time (not
+//!   command-line) concern and lives in `client::handshake` instead, since
+//!   it affects the `initialize` handshake's `clientInfo`/
+//!   `clientCapabilities`, not the spawned command/args.
+//!
+//! Both subprocess-based quirks share [`command_probe::read_command_output`]
+//! for the actual probe spawn+timeout logic.
 
 pub mod agent_detect;
 pub mod codex_compat;
 pub mod command_args;
+pub mod command_probe;
+pub mod copilot_quirks;
+pub mod gemini_quirks;
 pub mod model_request;
 pub mod model_support;
 pub mod registry;
@@ -31,6 +45,8 @@ pub use command_args::{
     CommandParts, basename_token, resolve_agent_close_after_stdin_end_ms,
     should_ignore_non_json_agent_output_line, split_command_line,
 };
+pub use copilot_quirks::ensure_copilot_acp_support;
+pub use gemini_quirks::{resolve_gemini_acp_startup_timeout_ms, resolve_gemini_command_args};
 pub use model_request::{
     RequestedModelUnsupportedError, RequestedModelUnsupportedReason,
     assert_requested_model_supported, resolve_requested_model_id,

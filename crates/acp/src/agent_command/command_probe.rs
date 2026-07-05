@@ -89,7 +89,10 @@ mod tests {
         smol::block_on(async {
             let output = read_command_output(
                 "/bin/sh",
-                &["-c".to_string(), "echo out-line; echo err-line 1>&2".to_string()],
+                &[
+                    "-c".to_string(),
+                    "echo out-line; echo err-line 1>&2".to_string(),
+                ],
                 Duration::from_secs(2),
             )
             .await

@@ -38,6 +38,20 @@ pub struct SpawnAgentOptions<'a> {
     pub env: &'a HashMap<String, String>,
     pub client_name: String,
     pub terminal: bool,
+    /// Whether `program`/`args` resolve to a Gemini CLI `--acp` invocation
+    /// (see [`crate::agent_command::is_gemini_acp_command`]). When true,
+    /// the `initialize` handshake races
+    /// [`crate::agent_command::gemini_quirks::resolve_gemini_acp_startup_timeout_ms`]
+    /// instead of waiting indefinitely, surfacing
+    /// [`AcpError::GeminiAcpStartupTimeout`] on expiry (matching acpx's
+    /// Gemini-specific startup-timeout handling).
+    pub is_gemini: bool,
+    /// Whether `program`/`args` resolve to a Devin ACP invocation (see
+    /// [`crate::agent_command::is_devin_acp_command`]). When true, the
+    /// advertised `clientInfo`/`clientCapabilities` are swapped for
+    /// Devin's Windsurf compatibility identity (see
+    /// `client::handshake`'s module docs).
+    pub is_devin: bool,
     /// Phase 4's filesystem/terminal/permission handlers and `session/update`
     /// notification sink, registered on the connection before the
     /// `initialize` handshake runs. Defaults (all `None`/empty) are fine for
@@ -71,19 +85,52 @@ impl AcpClient {
         let pid = child.id();
         let transport = take_transport(&mut child)?;
 
+        let init_outcome = if options.is_gemini {
+            let timeout = crate::agent_command::resolve_gemini_acp_startup_timeout_ms();
+            match crate::control::with_timeout(
+                spawn_and_initialize(
+                    transport,
+                    options.client_name.clone(),
+                    options.terminal,
+                    options.is_devin,
+                    options.handlers,
+                ),
+                Some(timeout),
+            )
+            .await
+            {
+                Ok(inner) => inner,
+                Err(AcpError::Timeout(_)) => {
+                    // The agent hasn't finished `initialize` within Gemini's
+                    // startup budget (usually stuck on interactive OAuth) —
+                    // kill the hung subprocess rather than leaking it, then
+                    // surface a Gemini-specific diagnostic.
+                    let _ = child.kill();
+                    let message = crate::agent_command::gemini_quirks::build_gemini_acp_startup_timeout_message(
+                        options.program,
+                    )
+                    .await;
+                    Err(AcpError::GeminiAcpStartupTimeout(message))
+                }
+                Err(other) => Err(other),
+            }
+        } else {
+            spawn_and_initialize(
+                transport,
+                options.client_name.clone(),
+                options.terminal,
+                options.is_devin,
+                options.handlers,
+            )
+            .await
+        };
+
         let RunningConnection {
             connection,
             init_response,
             task,
             shutdown_tx,
-        } = spawn_and_initialize(
-            transport,
-            options.client_name.clone(),
-            options.terminal,
-            options.handlers,
-        )
-        .await
-        .map_err(|err| attach_command(err, options.program))?;
+        } = init_outcome.map_err(|err| attach_command(err, options.program))?;
 
         Ok(Self {
             child,

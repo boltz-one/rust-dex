@@ -3,8 +3,8 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, Bounds, Context, FocusHandle, Focusable, HighlightStyle, KeyDownEvent, Keystroke,
-    Render, StyledText, canvas, rgb,
+    AnyElement, Bounds, Context, FocusHandle, Focusable, Font, FontFallbacks, HighlightStyle,
+    KeyDownEvent, Keystroke, Render, StyledText, canvas, rgb,
 };
 
 use crate::prelude::*;
@@ -15,6 +15,37 @@ use crate::prelude::*;
 const TERMINAL_FONT_FAMILY: &str = "IBM Plex Mono";
 const TERMINAL_FONT_SIZE: Pixels = px(12.5);
 const TERMINAL_LINE_HEIGHT: f32 = 1.5;
+
+/// Real shell prompts (starship, oh-my-posh, powerlevel10k, ...) commonly
+/// print Powerline/Nerd-Font glyphs from the Private Use Area — codepoints
+/// no ordinary typeface (including the bundled `TERMINAL_FONT_FAMILY`) has
+/// glyphs for, so they'd otherwise render as empty tofu boxes. This is a
+/// FALLBACK list, not a bundled asset: none of these are shipped by this
+/// workspace (bundling a full Nerd Font is tens of MB, well beyond this
+/// template's "no bundled assets" default — see `docs/project-overview-
+/// pdr.md`). If the user's system happens to have one of these installed
+/// (common on dev machines that already use a Nerd Font in their real
+/// terminal), `font_kit` picks it up automatically for glyphs
+/// `TERMINAL_FONT_FAMILY` doesn't cover; if none are installed, icons still
+/// show as tofu — a system font gap this crate can't fix without bundling a
+/// large asset, which is a separate decision, not something to do silently.
+fn terminal_font() -> Font {
+    Font {
+        family: TERMINAL_FONT_FAMILY.into(),
+        fallbacks: Some(FontFallbacks::from_fonts(vec![
+            "Symbols Nerd Font Mono".into(),
+            "Symbols Nerd Font".into(),
+            "JetBrainsMono Nerd Font Mono".into(),
+            "JetBrainsMono Nerd Font".into(),
+            "Hack Nerd Font Mono".into(),
+            "Hack Nerd Font".into(),
+            "MesloLGS NF".into(),
+            "FiraCode Nerd Font Mono".into(),
+            "FiraCode Nerd Font".into(),
+        ])),
+        ..Default::default()
+    }
+}
 /// Approximate cell pixel size at `TERMINAL_FONT_SIZE`/`TERMINAL_FONT_FAMILY`
 /// (monospace, so a single advance width applies to every glyph). Used both
 /// to seed the initial PTY size and to convert the pane's measured pixel
@@ -313,7 +344,7 @@ impl Render for TerminalView {
             .p_3()
             .bg(rgb(0x0D1117))
             .text_color(rgb(0xC9D1D9))
-            .font_family(TERMINAL_FONT_FAMILY)
+            .font(terminal_font())
             .text_size(TERMINAL_FONT_SIZE)
             .line_height(relative(TERMINAL_LINE_HEIGHT))
             .child(

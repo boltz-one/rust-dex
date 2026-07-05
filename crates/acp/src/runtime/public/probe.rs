@@ -32,7 +32,7 @@ pub async fn probe_runtime(options: &AcpRuntimeOptions) -> RuntimeHealthReport {
         .unwrap_or(crate::agent_command::DEFAULT_AGENT_NAME);
     let agent_command = options.agent_registry.resolve(agent_name);
 
-    let parts = match resolve_agent_program(&agent_command, None) {
+    let mut parts = match resolve_agent_program(&agent_command, None) {
         Ok(parts) => parts,
         Err(err) => {
             return RuntimeHealthReport {
@@ -47,6 +47,24 @@ pub async fn probe_runtime(options: &AcpRuntimeOptions) -> RuntimeHealthReport {
             };
         }
     };
+    parts.args =
+        crate::agent_command::resolve_gemini_command_args(&parts.command, &parts.args).await;
+    let is_gemini = crate::agent_command::is_gemini_acp_command(&parts.command, &parts.args);
+    let is_devin = crate::agent_command::is_devin_acp_command(&parts.command, &parts.args);
+    if crate::agent_command::is_copilot_acp_command(&parts.command, &parts.args) {
+        if let Err(err) = crate::agent_command::ensure_copilot_acp_support(&parts.command).await {
+            return RuntimeHealthReport {
+                ok: false,
+                message: "embedded ACP runtime probe failed".to_string(),
+                details: vec![
+                    format!("agent={agent_name}"),
+                    format!("command={agent_command}"),
+                    format!("cwd={}", options.cwd.display()),
+                    err.to_string(),
+                ],
+            };
+        }
+    }
 
     let env = build_agent_environment(std::env::vars(), None, None, cfg!(windows));
     let client = AcpClient::spawn(SpawnAgentOptions {
@@ -56,6 +74,8 @@ pub async fn probe_runtime(options: &AcpRuntimeOptions) -> RuntimeHealthReport {
         env: &env,
         client_name: "boltz-acp-probe".to_string(),
         terminal: options.terminal,
+        is_gemini,
+        is_devin,
         handlers: Default::default(),
     })
     .await;

@@ -1,0 +1,6 @@
+---
+source: crates/gpui-probe/tests/snapshot_smoke.rs
+expression: text
+---
+alpha enabled=true
+zeta enabled=true

@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use boltz_acp::client::{AcpClient, SpawnAgentOptions};
+use boltz_acp::error::AcpError;
 
 fn fake_agent_path() -> &'static str {
     env!("CARGO_BIN_EXE_acp-fake-agent")
@@ -24,6 +25,8 @@ fn spawn_handshake_and_shutdown() {
             env: &env,
             client_name: "boltz-acp-test".to_string(),
             terminal: true,
+            is_gemini: false,
+            is_devin: false,
             handlers: Default::default(),
         })
         .await
@@ -48,6 +51,8 @@ fn sigterm_ignoring_agent_escalates_to_sigkill() {
             env: &env,
             client_name: "boltz-acp-test".to_string(),
             terminal: false,
+            is_gemini: false,
+            is_devin: false,
             handlers: Default::default(),
         })
         .await
@@ -69,6 +74,8 @@ fn session_new_returns_typed_response() {
             env: &env,
             client_name: "boltz-acp-test".to_string(),
             terminal: false,
+            is_gemini: false,
+            is_devin: false,
             handlers: Default::default(),
         })
         .await
@@ -83,6 +90,143 @@ fn session_new_returns_typed_response() {
         // so a reconnect-after-crash test can tell resumed sessions (id
         // unchanged) apart from freshly created ones (new pid suffix).
         assert!(response.session_id.0.starts_with("fake-session-"));
+
+        client.shutdown().await;
+    });
+}
+
+#[test]
+fn devin_spawn_advertises_windsurf_client_identity() {
+    // Ports the deferred Devin runtime quirk: `SpawnAgentOptions.is_devin`
+    // must swap the advertised `clientInfo`/`clientCapabilities` for
+    // Devin's Windsurf compatibility identity during the real `initialize`
+    // handshake, not just in a unit-tested helper function. The fake agent
+    // echoes what it received back under `_meta` (see
+    // `tests/fixtures/fake_agent/main.rs`) so this test can assert on the
+    // wire-level request, not just this crate's internal call.
+    smol::block_on(async {
+        let env = HashMap::new();
+        let client = AcpClient::spawn(SpawnAgentOptions {
+            program: fake_agent_path(),
+            args: &[],
+            cwd: Path::new("/tmp"),
+            env: &env,
+            client_name: "boltz-acp-test".to_string(),
+            terminal: false,
+            is_gemini: false,
+            is_devin: true,
+            handlers: Default::default(),
+        })
+        .await
+        .expect("spawn+handshake should succeed");
+
+        let meta = client
+            .init_response()
+            .meta
+            .as_ref()
+            .expect("fake agent should echo request info back under _meta");
+
+        let echoed_client_info = meta
+            .get("echoClientInfo")
+            .expect("echoClientInfo should be present");
+        assert_eq!(echoed_client_info["name"], "windsurf");
+        assert_eq!(echoed_client_info["version"], "1.110.1");
+
+        let echoed_capabilities = meta
+            .get("echoClientCapabilities")
+            .expect("echoClientCapabilities should be present");
+        assert_eq!(
+            echoed_capabilities["_meta"]["cognition.ai/requestDiagnostics"],
+            true
+        );
+
+        client.shutdown().await;
+    });
+}
+
+#[test]
+fn gemini_startup_timeout_kills_hung_agent_and_reports_diagnostic() {
+    // Ports the deferred Gemini runtime quirk: when `is_gemini` is set,
+    // `AcpClient::spawn` must race the `initialize` handshake against
+    // `resolve_gemini_acp_startup_timeout_ms()` instead of waiting
+    // indefinitely, kill the hung subprocess, and surface
+    // `AcpError::GeminiAcpStartupTimeout` with a diagnostic message. Uses
+    // the real env-var override (matching production's only configuration
+    // knob for this timeout) plus the fake agent's initialize-delay toggle
+    // to force a real timeout quickly instead of waiting 15s.
+    //
+    // Safety: `set_var` only affects this process's env, and no other test
+    // in this binary reads `ACPX_GEMINI_ACP_STARTUP_TIMEOUT_MS`.
+    unsafe {
+        std::env::set_var("ACPX_GEMINI_ACP_STARTUP_TIMEOUT_MS", "100");
+    }
+
+    smol::block_on(async {
+        let mut env = HashMap::new();
+        env.insert(
+            "ACP_FAKE_AGENT_INITIALIZE_DELAY_MS".to_string(),
+            "5000".to_string(),
+        );
+        let result = AcpClient::spawn(SpawnAgentOptions {
+            program: fake_agent_path(),
+            args: &[],
+            cwd: Path::new("/tmp"),
+            env: &env,
+            client_name: "boltz-acp-test".to_string(),
+            terminal: false,
+            is_gemini: true,
+            is_devin: false,
+            handlers: Default::default(),
+        })
+        .await;
+
+        match result {
+            Ok(_) => panic!("expected initialize to time out, but it succeeded"),
+            Err(AcpError::GeminiAcpStartupTimeout(message)) => {
+                assert!(message.contains("startup timed out"));
+            }
+            Err(other) => panic!("expected GeminiAcpStartupTimeout, got {other:?}"),
+        }
+    });
+
+    unsafe {
+        std::env::remove_var("ACPX_GEMINI_ACP_STARTUP_TIMEOUT_MS");
+    }
+}
+
+#[test]
+fn non_devin_spawn_advertises_real_client_identity() {
+    smol::block_on(async {
+        let env = HashMap::new();
+        let client = AcpClient::spawn(SpawnAgentOptions {
+            program: fake_agent_path(),
+            args: &[],
+            cwd: Path::new("/tmp"),
+            env: &env,
+            client_name: "boltz-acp-test".to_string(),
+            terminal: false,
+            is_gemini: false,
+            is_devin: false,
+            handlers: Default::default(),
+        })
+        .await
+        .expect("spawn+handshake should succeed");
+
+        let meta = client
+            .init_response()
+            .meta
+            .as_ref()
+            .expect("fake agent should echo request info back under _meta");
+        let echoed_client_info = meta
+            .get("echoClientInfo")
+            .expect("echoClientInfo should be present");
+        assert_eq!(echoed_client_info["name"], "boltz-acp-test");
+        assert!(
+            meta.get("echoClientCapabilities")
+                .unwrap()
+                .get("_meta")
+                .is_none()
+        );
 
         client.shutdown().await;
     });
