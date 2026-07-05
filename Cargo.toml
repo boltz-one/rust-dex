@@ -47,11 +47,11 @@ component = { path = "crates/component", version = "0.1.0", package = "boltz-com
 derive_refineable = { path = "crates/refineable/derive_refineable", version = "0.1.0", package = "boltz-derive-refineable" }
 font_kit = { path = "crates/font_kit", version = "0.14.1", package = "boltz-font-kit" }
 fonts_ibm_plex = { path = "crates/fonts-ibm-plex", version = "0.1.0", package = "boltz-fonts-ibm-plex" }
-gpui = { path = "crates/gpui", default-features = false, version = "0.2.3", package = "boltz-gpui" }
+gpui = { path = "crates/gpui", default-features = false, version = "0.2.4", package = "boltz-gpui" }
 gpui_shared_string = { path = "crates/gpui_shared_string", version = "0.1.0", package = "boltz-gpui-shared-string" }
 gpui_linux = { path = "crates/gpui_linux", default-features = false, version = "0.1.0", package = "boltz-gpui-linux" }
 gpui_macos = { path = "crates/gpui_macos", default-features = false, version = "0.1.0", package = "boltz-gpui-macos" }
-gpui_macros = { path = "crates/gpui_macros", version = "0.1.0", package = "boltz-gpui-macros" }
+gpui_macros = { path = "crates/gpui_macros", version = "0.1.1", package = "boltz-gpui-macros" }
 gpui_platform = { path = "crates/gpui_platform", default-features = false, version = "0.1.0", package = "boltz-gpui-platform" }
 gpui_wgpu = { path = "crates/gpui_wgpu", version = "0.1.0", package = "boltz-gpui-wgpu" }
 gpui_windows = { path = "crates/gpui_windows", default-features = false, version = "0.1.0", package = "boltz-gpui-windows" }
