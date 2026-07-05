@@ -58,6 +58,23 @@ fn run_app() {
                 cx.text_system().add_fonts(vec![inter]).ok();
             }
 
+            // `CodeEditor`/`TerminalView`/`TerminalPanel` (crates/ui) all
+            // hardcode `font_family("IBM Plex Mono")` for their monospace
+            // content, but never load it themselves — same pattern as Inter
+            // above: the *consuming app* is responsible for loading whatever
+            // bundled font its `crates/ui` components ask for by name (see
+            // `docs/system-architecture.md` § Font System — "no bundled
+            // fonts; all system fonts" for the template itself, consumer
+            // apps opt in via `rust-embed`). Without this, "IBM Plex Mono"
+            // resolves to a fallback font that doesn't have the same glyph
+            // coverage, which is what broke text/box-drawing rendering
+            // inside the terminal.
+            let ibm_plex_mono_fonts = fonts_ibm_plex::Assets::iter()
+                .filter(|path| path.starts_with("fonts/IBMPlexMono-"))
+                .filter_map(|path| fonts_ibm_plex::Assets.load(&path).ok().flatten())
+                .collect::<Vec<_>>();
+            cx.text_system().add_fonts(ibm_plex_mono_fonts).ok();
+
             theme::init(LoadThemes::JustBase, cx);
             theme::set_theme_settings_provider(Box::new(BaseThemeSettingsProvider::default()), cx);
 

@@ -17,6 +17,7 @@ members = [
     "crates/gpui_util",
     "crates/gpui_wgpu",
     "crates/gpui_windows",
+    "crates/gpui-probe",
     "crates/http_client",
     "crates/icons",
     "crates/language_core",
@@ -80,6 +81,7 @@ util_macros = { path = "crates/util_macros", version = "0.1.0", package = "boltz
 logging = { path = "crates/logging", version = "0.1.0", package = "boltz-logging" }
 tracing_facade = { path = "crates/tracing_facade", version = "0.1.0", package = "boltz-tracing-facade" }
 tracing_facade_macros = { path = "crates/tracing_facade_macros", version = "0.1.0", package = "boltz-tracing-facade-macros" }
+gpui-probe = { path = "crates/gpui-probe", version = "0.1.0" }
 agent-client-protocol = "=1.0.1"
 # Must stay in lockstep with the exact schema version agent-client-protocol 1.0.1
 # depends on (verified against the crates.io sparse index: agent-client-protocol
