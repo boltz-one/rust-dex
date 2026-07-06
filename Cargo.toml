@@ -61,7 +61,7 @@ gpui_wgpu = { path = "crates/gpui_wgpu", version = "0.1.0", package = "boltz-gpu
 gpui_windows = { path = "crates/gpui_windows", default-features = false, version = "0.1.0", package = "boltz-gpui-windows" }
 gpui_util = { path = "crates/gpui_util", version = "0.1.0", package = "boltz-gpui-util" }
 http_client = { path = "crates/http_client", version = "0.1.0", package = "boltz-http-client" }
-icons = { path = "crates/icons", version = "0.1.0", package = "boltz-icons" }
+icons = { path = "crates/icons", version = "0.1.2", package = "boltz-icons" }
 language = { path = "crates/language", version = "0.1.0", package = "boltz-language" }
 media = { path = "crates/media", version = "0.1.0", package = "boltz-media" }
 menu = { path = "crates/menu", version = "0.1.0", package = "boltz-menu" }
