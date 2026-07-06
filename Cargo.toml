@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "crates/app",
     "examples/ui_gallery",
-    "crates/acp",
     "crates/collections",
     "crates/component",
     "crates/font_kit",
@@ -47,7 +46,6 @@ edition = "2024"
 repository = "https://github.com/boltz-one/rust-dex"
 
 [workspace.dependencies]
-acp = { path = "crates/acp", version = "0.1.0", package = "boltz-acpx" }
 collections = { path = "crates/collections", version = "0.1.0", package = "boltz-collections" }
 component = { path = "crates/component", version = "0.1.0", package = "boltz-component" }
 derive_refineable = { path = "crates/refineable/derive_refineable", version = "0.1.0", package = "boltz-derive-refineable" }
