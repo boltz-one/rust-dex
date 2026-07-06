@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use gpui::{
     AnyElement, Context, Entity, Focusable, HighlightStyle, Render, StyledText, rgb, white,
 };
-use language_core::{DefaultLanguageRegistry, LanguageRegistry};
+use language::{DefaultLanguageRegistry, LanguageRegistry};
 
 use crate::TextInput;
 use crate::prelude::*;
@@ -100,7 +100,7 @@ impl CodeEditor {
 
     /// Enables real tree-sitter syntax highlighting for the given file
     /// extension (no leading dot, e.g. `"rs"`) — see
-    /// [`language_core::DefaultLanguageRegistry`] for which extensions are
+    /// [`language::DefaultLanguageRegistry`] for which extensions are
     /// compiled in. Highlighting only renders while [`Self::read_only`] is
     /// set: `TextInput` (which this component wraps for keystroke handling)
     /// has no cursor-position tracking beyond append-at-the-end (see the
@@ -179,7 +179,7 @@ impl Render for CodeEditor {
                     .map(|language| {
                         let syntax = cx.theme().syntax();
                         let highlights: Vec<(Range<usize>, HighlightStyle)> =
-                            language_core::highlighted_spans(language, &text)
+                            language::highlighted_spans(language, &text)
                                 .into_iter()
                                 .filter_map(|(range, name)| {
                                     style_for_capture(syntax, &name).map(|style| (range, style))
@@ -229,7 +229,7 @@ pub fn code_editor_preview(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 #[cfg(test)]
 mod tests {
-    use language_core::{DefaultLanguageRegistry, LanguageRegistry};
+    use language::{DefaultLanguageRegistry, LanguageRegistry};
     use theme::default_themes;
 
     /// Audits that every capture name tree-sitter produces for each
@@ -252,7 +252,7 @@ mod tests {
         let theme = &default_themes().themes[0];
         let syntax = theme.syntax();
 
-        let spans = language_core::highlighted_spans(language, source);
+        let spans = language::highlighted_spans(language, source);
         assert!(
             !spans.is_empty(),
             "expected at least one highlight span for .{extension}"

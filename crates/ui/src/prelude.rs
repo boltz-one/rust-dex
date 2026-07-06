@@ -48,6 +48,11 @@ pub use crate::{
     SelectableButton,
 };
 pub use crate::{ButtonCommon, Color};
+pub use crate::{
+    CannotRemoveLastPane, ClosePane, FocusDown, FocusLeft, FocusRight, FocusUp, Member, PaneAxis,
+    SplitDirection, SplitDown, SplitLeft, SplitRight, SplitUp, TabContent, TabId,
+    register_pane_keybindings,
+};
 pub use crate::{Headline, HeadlineSize};
 pub use crate::{Icon, IconName, IconPosition, IconSize};
 pub use crate::{Label, LabelCommon, LabelSize, LineHeightStyle, LoadingLabel};

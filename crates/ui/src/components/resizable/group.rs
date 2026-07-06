@@ -1,13 +1,12 @@
-//! Horizontal split panels with a draggable divider and min/max clamping.
-//!
-//! Divider drag reuses the pointer-delta + clamp pattern from column resize
-//! (`redistributable_columns.rs` / `data_table.rs`).
+//! Standalone two-panel [`ResizablePanelGroup`] built on [`super::ResizablePanel`]/
+//! [`super::ResizableHandle`] — unrelated to [`crate::PaneGroup`]'s recursive
+//! tree, kept for existing simple left/right split use cases.
 
 use std::rc::Rc;
 
 use gpui::{AnyElement, Bounds, Context, DragMoveEvent, Empty, Render, canvas};
-use smallvec::SmallVec;
 
+use super::{ResizableHandle, ResizablePanel};
 use crate::prelude::*;
 
 /// Drag payload for [`ResizableHandle`].
@@ -19,67 +18,6 @@ struct ResizableDrag {
 
 fn clamp_fraction(fraction: f32, min: f32, max: f32) -> f32 {
     fraction.clamp(min, max)
-}
-
-/// A panel inside a [`ResizablePanelGroup`].
-#[derive(IntoElement)]
-pub struct ResizablePanel {
-    children: SmallVec<[AnyElement; 2]>,
-    fraction: f32,
-}
-
-impl ResizablePanel {
-    pub fn new() -> Self {
-        Self {
-            children: SmallVec::new(),
-            fraction: 1.0,
-        }
-    }
-
-    pub(crate) fn fraction(mut self, fraction: f32) -> Self {
-        self.fraction = fraction;
-        self
-    }
-}
-
-impl Default for ResizablePanel {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ParentElement for ResizablePanel {
-    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
-        self.children.extend(elements);
-    }
-}
-
-impl RenderOnce for ResizablePanel {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        div()
-            .h_full()
-            .overflow_hidden()
-            .when(self.fraction >= 1.0, |this| this.flex_grow())
-            .when(self.fraction < 1.0, |this| {
-                this.flex_shrink_0().w(relative(self.fraction))
-            })
-            .bg(semantic::surface(cx))
-            .children(self.children)
-    }
-}
-
-/// Draggable divider between two [`ResizablePanel`]s.
-#[derive(IntoElement)]
-pub struct ResizableHandle;
-
-impl RenderOnce for ResizableHandle {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        div()
-            .id("resizable-handle")
-            .w(px(1.))
-            .h_full()
-            .bg(semantic::border(cx))
-    }
 }
 
 /// Horizontal panel group with a draggable split handle.
@@ -160,16 +98,7 @@ impl Render for ResizablePanelGroup {
         let container_bounds = self.container_bounds.clone();
         let mouse_x = window.mouse_position().x;
 
-        let handle = div()
-            .id("resizable-handle-hit")
-            .w(px(8.))
-            .h_full()
-            .flex_shrink_0()
-            .cursor_col_resize()
-            .flex()
-            .items_center()
-            .justify_center()
-            .child(ResizableHandle)
+        let handle = ResizableHandle::new("resizable-handle-hit")
             .on_drag(
                 ResizableDrag {
                     start_fraction: left_fraction,

@@ -25,3 +25,4 @@ ui.workspace = true
 [dev-dependencies]
 chrono.workspace = true
 gpui = { workspace = true, features = ["test-support"] }
+gpui_probe = { workspace = true, features = ["test-support"] }
