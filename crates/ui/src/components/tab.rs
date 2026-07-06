@@ -82,11 +82,22 @@ impl ParentElement for Tab {
 impl RenderOnce for Tab {
     #[allow(refining_impl_trait)]
     fn render(self, _: &mut Window, cx: &mut App) -> Stateful<Div> {
+        // Title area grows (`flex_1`) so the end slot (e.g. a close "x") is
+        // pinned to the tab's right edge instead of sitting right after the
+        // text.
         let content = h_flex()
+            .w_full()
             .items_center()
             .gap_2()
             .children(self.start_slot)
-            .children(self.children)
+            .child(
+                h_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .items_center()
+                    .gap_2()
+                    .children(self.children),
+            )
             .children(self.end_slot);
 
         match self.style {
@@ -112,6 +123,7 @@ impl RenderOnce for Tab {
 
                 self.div
                     .h_full()
+                    .min_w(px(140.))
                     .flex()
                     .items_center()
                     .cursor_pointer()
