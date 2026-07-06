@@ -44,7 +44,11 @@ impl Render for Pane {
             let tab = Tab::new(("pane-tab", tab_id.0))
                 .toggle_state(selected)
                 .end_slot(close_button)
-                .child(title)
+                // Wrap in `Label` so the tab title uses the UI font family/size
+                // consistently (a bare string child inherits the window's
+                // default text size, which mismatches other UI text and can
+                // overflow the tab strip's height).
+                .child(Label::new(title).size(LabelSize::Small))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.activate(ix, cx);
                 }))
