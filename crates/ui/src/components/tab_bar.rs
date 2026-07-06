@@ -1,8 +1,10 @@
+use std::cmp::Ordering;
+
 use gpui::{AnyElement, ScrollHandle};
 use smallvec::SmallVec;
 
-use crate::Tab;
 use crate::prelude::*;
+use crate::{Tab, TabPosition};
 
 /// Visual style for [`TabBar`] and its child [`Tab`]s.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -129,12 +131,25 @@ impl RenderOnce for TabBar {
             // its horizontal overflow via `.overflow_x_scroll()`, and an outer
             // clip on this `relative` wrapper made the `Tab` children
             // non-hit-testable (clicks at their real bounds silently no-op'd).
-            // No bottom border line (borderless header per the requested
-            // mockup); the tabs row fills the bar directly.
+            // Bottom border line: painted as an absolute overlay *before*
+            // `tabs_row` (so it sits underneath), rather than as a
+            // `border_b_1` on this container, because the active `Tab`
+            // "cuts through" the line via `pb_px` — that only reads
+            // correctly if the line is painted under the tabs, not as part
+            // of this wrapper's own border.
             TabBarStyle::Underline => div()
                 .relative()
                 .flex_1()
                 .h_full()
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full()
+                        .border_b_1()
+                        .border_color(cx.theme().colors().border),
+                )
                 .child(tabs_row)
                 .into_any_element(),
             TabBarStyle::Pills => div()
@@ -153,13 +168,16 @@ impl RenderOnce for TabBar {
             .flex_none()
             .w_full()
             .h(Tab::container_height(cx))
-            .bg(semantic::surface(cx))
+            .bg(cx.theme().colors().tab_bar_background)
             .when(!self.start_children.is_empty(), |this| {
                 this.child(
                     h_flex()
                         .flex_none()
                         .gap(DynamicSpacing::Base04.rems(cx))
                         .px(DynamicSpacing::Base06.rems(cx))
+                        .border_b_1()
+                        .border_r_1()
+                        .border_color(cx.theme().colors().border)
                         .children(self.start_children),
                 )
             })
@@ -170,6 +188,9 @@ impl RenderOnce for TabBar {
                         .flex_none()
                         .gap(DynamicSpacing::Base04.rems(cx))
                         .px(DynamicSpacing::Base06.rems(cx))
+                        .border_b_1()
+                        .border_l_1()
+                        .border_color(cx.theme().colors().border)
                         .children(self.end_children),
                 )
             })
@@ -199,9 +220,22 @@ impl Component for TabBar {
                         vec![single_example(
                             "With Tabs",
                             TabBar::new("underline_tab_bar")
-                                .child(Tab::new("u_tab1").toggle_state(true).child("Overview"))
-                                .child(Tab::new("u_tab2").child("Activity"))
-                                .child(Tab::new("u_tab3").child("Settings"))
+                                .child(
+                                    Tab::new("u_tab1")
+                                        .position(TabPosition::First)
+                                        .toggle_state(true)
+                                        .child("Overview"),
+                                )
+                                .child(
+                                    Tab::new("u_tab2")
+                                        .position(TabPosition::Middle(Ordering::Greater))
+                                        .child("Activity"),
+                                )
+                                .child(
+                                    Tab::new("u_tab3")
+                                        .position(TabPosition::Last)
+                                        .child("Settings"),
+                                )
                                 .into_any_element(),
                         )],
                     ),
