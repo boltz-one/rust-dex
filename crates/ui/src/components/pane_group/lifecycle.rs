@@ -20,9 +20,17 @@ impl PaneGroup {
             Member::Split(axis) => {
                 match axis.remove(id) {
                     RemoveOutcome::NotFound => {}
-                    RemoveOutcome::Removed => self.reassign_active_if_removed(id, cx),
+                    RemoveOutcome::Removed => {
+                        // Deterministically close the removed pane's tabs (we
+                        // still hold `target`) so PTY-owning tabs shut down —
+                        // never rely on `Entity`/`Box` drop timing. Only fires
+                        // when the pane was actually removed, not on NotFound.
+                        target.update(cx, |pane, cx| pane.close_all_tabs(cx));
+                        self.reassign_active_if_removed(id, cx);
+                    }
                     RemoveOutcome::Collapse(replacement) => {
                         self.root = replacement;
+                        target.update(cx, |pane, cx| pane.close_all_tabs(cx));
                         self.reassign_active_if_removed(id, cx);
                     }
                 }

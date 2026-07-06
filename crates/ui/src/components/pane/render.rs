@@ -1,7 +1,7 @@
 //! [`Render`] impl for [`super::Pane`] — the tab strip (with close/add
 //! affordances and drag-to-reorder) plus the active tab's content.
 
-use gpui::Empty;
+use gpui::{Empty, canvas};
 
 use super::{Pane, PaneEvent};
 use crate::{IconButton, IconName, IconSize, Tab, TabBar, prelude::*};
@@ -24,6 +24,20 @@ struct TabDragPayload {
 impl Render for Pane {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let active_idx = self.active_idx;
+
+        // One-frame-lagged resize hook: the `canvas()` below wrote the
+        // content-area bounds during the previous paint. Deliver `on_resize`
+        // to the active tab when EITHER the bounds changed OR the active tab
+        // changed (keyed by `TabId`) — so a freshly activated/added tab gets an
+        // initial size even if the pane itself never physically resized.
+        let active_id = self.tabs.get(active_idx).map(|(id, _)| *id);
+        if let (Some(bounds), Some(id)) = (self.content_bounds.get(), active_id) {
+            if self.notified_resize.get() != Some((id, bounds)) {
+                self.notified_resize.set(Some((id, bounds)));
+                self.tabs[active_idx].1.on_resize(bounds, cx);
+            }
+        }
+
         let mut tab_bar = TabBar::new("pane-tab-bar");
 
         for ix in 0..self.tabs.len() {
@@ -104,10 +118,26 @@ impl Render for Pane {
             .get(active_idx)
             .map(|(_, content)| content.render(true, window, cx));
 
-        v_flex()
-            .id("pane")
-            .size_full()
-            .child(tab_bar)
-            .child(div().flex_1().min_h_0().overflow_hidden().children(content))
+        // Measure the tab-content area so `on_resize` can fire next frame. The
+        // canvas paints nothing; it only records its own bounds (mirrors
+        // `TerminalView`'s container measurement).
+        let measure = self.content_bounds.clone();
+
+        v_flex().id("pane").size_full().child(tab_bar).child(
+            div()
+                .relative()
+                .flex_1()
+                .min_h_0()
+                .overflow_hidden()
+                .child(
+                    canvas(
+                        move |bounds, _, _| measure.set(Some(bounds)),
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .size_full(),
+                )
+                .children(content),
+        )
     }
 }
