@@ -82,6 +82,10 @@ pub struct Pane {
     active_idx: usize,
     next_tab_id: u64,
     new_tab_factory: Rc<dyn Fn() -> Box<dyn TabContent>>,
+    /// Whether this pane is the active pane of its [`crate::PaneGroup`]. Only
+    /// the focused pane's active tab is drawn "selected" (accent), so the
+    /// window shows exactly one active tab. Kept in sync by `PaneGroup`.
+    focused: bool,
 }
 
 impl Pane {
@@ -93,6 +97,16 @@ impl Pane {
             active_idx: 0,
             next_tab_id: 0,
             new_tab_factory: Rc::new(|| Box::new(PlaceholderTab)),
+            focused: true,
+        }
+    }
+
+    /// Sets whether this pane is its group's active pane (drives whether its
+    /// active tab is shown as selected). Called by [`crate::PaneGroup`].
+    pub fn set_focused(&mut self, focused: bool, cx: &mut Context<Self>) {
+        if self.focused != focused {
+            self.focused = focused;
+            cx.notify();
         }
     }
 

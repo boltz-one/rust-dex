@@ -47,6 +47,7 @@ impl PaneGroup {
                 MouseButton::Left,
                 cx.listener(move |this, _, window, cx| {
                     this.active_pane = focus_target.clone();
+                    this.sync_focus(cx);
                     window.focus(&this.focus_handle, cx);
                     cx.notify();
                 }),

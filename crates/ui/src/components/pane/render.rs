@@ -29,7 +29,9 @@ impl Render for Pane {
         for ix in 0..self.tabs.len() {
             let tab_id = self.tabs[ix].0;
             let title = self.tabs[ix].1.title();
-            let selected = ix == active_idx;
+            // Only the focused pane's active tab is drawn selected, so the
+            // whole window shows a single active tab.
+            let selected = ix == active_idx && self.focused;
 
             // Per-tab hover group: the close button is hidden until the mouse
             // hovers this specific tab (each tab is its own `group` scope, so

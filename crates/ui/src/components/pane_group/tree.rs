@@ -124,6 +124,20 @@ impl Member {
     }
 }
 
+impl Member {
+    /// Collects every leaf pane in this subtree (used to sync per-pane focus).
+    pub(super) fn collect_leaves(&self, out: &mut Vec<Entity<Pane>>) {
+        match self {
+            Member::Leaf(pane) => out.push(pane.clone()),
+            Member::Split(axis) => {
+                for member in &axis.members {
+                    member.collect_leaves(out);
+                }
+            }
+        }
+    }
+}
+
 fn rebalance(flexes: &mut [f32]) {
     if flexes.is_empty() {
         return;

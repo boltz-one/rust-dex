@@ -35,6 +35,7 @@ impl PaneGroup {
         if self.active_pane.entity_id() == removed_id {
             self.active_pane = tree::first_leaf(&self.root);
         }
+        self.sync_focus(cx);
         cx.notify();
     }
 

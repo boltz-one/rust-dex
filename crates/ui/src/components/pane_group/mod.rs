@@ -140,6 +140,7 @@ impl PaneGroup {
     /// certainly not what the caller wants.
     pub fn set_active_pane(&mut self, pane: Entity<Pane>, cx: &mut Context<Self>) {
         self.active_pane = pane;
+        self.sync_focus(cx);
         cx.notify();
     }
 
@@ -165,7 +166,20 @@ impl PaneGroup {
         );
 
         self.active_pane = new_pane;
+        self.sync_focus(cx);
         cx.notify();
+    }
+
+    /// Marks the active pane focused and every other leaf pane unfocused, so
+    /// only the active pane's active tab renders "selected".
+    pub(super) fn sync_focus(&mut self, cx: &mut Context<Self>) {
+        let active_id = self.active_pane.entity_id();
+        let mut leaves = Vec::new();
+        self.root.collect_leaves(&mut leaves);
+        for pane in leaves {
+            let focused = pane.entity_id() == active_id;
+            pane.update(cx, |pane, cx| pane.set_focused(focused, cx));
+        }
     }
 
     /// Removes the active pane from the tree. Errs if it is the last pane.
@@ -184,6 +198,7 @@ impl PaneGroup {
         };
         if let Some(neighbor) = neighbor {
             self.active_pane = neighbor;
+            self.sync_focus(cx);
             cx.notify();
         }
     }
