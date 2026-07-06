@@ -3,8 +3,8 @@ use theme::{Appearance, SystemAppearance};
 use ui::prelude::*;
 use ui::{
     Calendar, Carousel, Combobox, Command, CommandItem, ContextMenu, DatePicker, InputOtp, Menubar,
-    MultiSelect, NavigationMenu, NavigationMenuItemDef, NavigationMenuSubItem, ResizablePanelGroup,
-    SearchInput, SonnerStack, TabSwitcher, TabSwitcherItem, TerminalView,
+    MultiSelect, NavigationMenu, NavigationMenuItemDef, NavigationMenuSubItem, PaneGroup,
+    ResizablePanelGroup, SearchInput, SonnerStack, TabSwitcher, TabSwitcherItem, TerminalView,
 };
 
 use crate::pages;
@@ -122,6 +122,11 @@ pub struct GalleryApp {
     /// Resizable split-panel demo (Layout + Data pages) — created once so
     /// the dragged split fraction persists across re-renders.
     pub(crate) resizable: Entity<ResizablePanelGroup>,
+    /// Interactive 2x2 `PaneGroup` demo (Layout page) — created once via
+    /// [`pages::layout::build_pane_group_demo`] so its split tree, active
+    /// pane, per-pane tabs, and divider positions all persist across
+    /// re-renders instead of resetting every frame.
+    pub(crate) pane_group: Entity<PaneGroup>,
     /// Menubar demo (Navigation + Overlays pages). Unlike the other entities
     /// above, this can't be created in `new()`: its dropdown `ContextMenu`s
     /// require `&mut Window` (via `ContextMenu::build`), and `GalleryApp::new`
@@ -262,6 +267,7 @@ impl GalleryApp {
                 .min_left_fraction(0.2)
                 .max_left_fraction(0.8)
             }),
+            pane_group: pages::layout::build_pane_group_demo(cx),
             menubar: None,
         }
     }

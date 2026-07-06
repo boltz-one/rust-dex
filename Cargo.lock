@@ -1009,7 +1009,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "boltz-language-core"
+name = "boltz-language"
 version = "0.1.0"
 dependencies = [
  "boltz-rope",
@@ -1160,14 +1160,14 @@ version = "0.1.0"
 
 [[package]]
 name = "boltz-ui"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "boltz-component",
  "boltz-gpui",
  "boltz-gpui-macros",
  "boltz-gpui-util",
  "boltz-icons",
- "boltz-language-core",
+ "boltz-language",
  "boltz-menu",
  "boltz-syntax-theme",
  "boltz-terminal",
@@ -5911,6 +5911,7 @@ dependencies = [
  "boltz-fonts-ibm-plex",
  "boltz-gpui",
  "boltz-gpui-platform",
+ "boltz-gpui-probe",
  "boltz-icons",
  "boltz-theme",
  "boltz-ui",

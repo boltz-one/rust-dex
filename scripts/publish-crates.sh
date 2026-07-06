@@ -49,6 +49,7 @@ PACKAGES=(
   boltz-tracing-facade-macros
   boltz-tracing-facade
   boltz-sum-tree
+  boltz-rope
   boltz-gpui
   boltz-syntax-theme
   boltz-icons
@@ -62,6 +63,7 @@ PACKAGES=(
   boltz-gpui-macos
   boltz-component
   boltz-gpui-platform
+  boltz-language
   boltz-ui
   boltz-app
   boltz-gpui-probe
