@@ -6130,6 +6130,7 @@ name = "ui_gallery"
 version = "0.1.0"
 dependencies = [
  "boltz-component",
+ "boltz-fonts-ibm-plex",
  "boltz-gpui",
  "boltz-gpui-platform",
  "boltz-icons",
