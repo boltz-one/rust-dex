@@ -72,7 +72,7 @@ sum_tree = { path = "crates/sum_tree", version = "0.1.0", package = "boltz-sum-t
 syntax_theme = { path = "crates/syntax_theme", version = "0.1.0", package = "boltz-syntax-theme" }
 terminal = { path = "crates/terminal", version = "0.1.0", package = "boltz-terminal" }
 theme = { path = "crates/theme", version = "0.1.0", package = "boltz-theme" }
-ui = { path = "crates/ui", version = "0.2.1", package = "boltz-ui" }
+ui = { path = "crates/ui", version = "0.2.2", package = "boltz-ui" }
 ui_macros = { path = "crates/ui_macros", version = "0.1.0", package = "boltz-ui-macros" }
 util = { path = "crates/util", version = "0.1.0", package = "boltz-util" }
 util_macros = { path = "crates/util_macros", version = "0.1.0", package = "boltz-util-macros" }

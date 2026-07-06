@@ -105,10 +105,16 @@ impl RenderOnce for Tab {
                     )
                 };
 
+                // Fill the parent TabBar's fixed height and vertically center
+                // the label instead of setting a large fixed `py` (which made
+                // the tab taller than `TabBar`'s container height, overflowing
+                // and clipping the title at the top).
                 self.div
+                    .h_full()
+                    .flex()
+                    .items_center()
                     .cursor_pointer()
-                    .px_1()
-                    .py_4()
+                    .px_2()
                     .border_b_2()
                     .border_color(border_color)
                     .text_color(text_color)
