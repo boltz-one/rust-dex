@@ -19,7 +19,7 @@ use super::parse::parse_session_record;
 use crate::session::record::SessionRecord;
 use crate::session::store_options::{AcpFileSessionStoreOptions, ensure_session_dir};
 
-const SESSION_INDEX_SCHEMA: &str = "boltz-acp.session-index.v1";
+const SESSION_INDEX_SCHEMA: &str = "boltz-acpx.session-index.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionIndexEntry {

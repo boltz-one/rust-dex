@@ -104,7 +104,7 @@ crates/acp/src/
 9. For gap 16: add `observed_session_updates`/`processed_session_updates` counters (or equivalent) to `ConnectedSession`; add a suppression toggle consulted by wherever `session/update` notifications are currently forwarded from the transport to the live consumer. In `acquire_via_rpc`'s load branch, set suppression before calling `session_load`, clear it after the drain condition (per this phase's ADR) is satisfied.
 10. Unit tests: `build_claude_code_options_meta`'s field mapping (pure function, easy to test in isolation); `clear_omitted_fresh_session_config_options`/`apply_reconnected_model_state`/`remove_model_config_options` (pure logic, test each branch); `maybe_wrap_session_control_error`'s call-site integration (verify the wrapped message actually reaches the caller, not just that the function itself works — it's already unit-tested in isolation).
 11. **Real call-path integration tests** (required — several of these gaps are "orphaned function" fixes): (a) spawn the fake agent, close a session with discard=true, confirm (via the fake agent logging received RPCs) that `session/close` was actually sent; (b) spawn with a fake-agent capability profile that does NOT advertise `session_capabilities.close`, confirm `close()` does NOT attempt the RPC and doesn't error; (c) set an invalid mode via `set_session_mode` against a fake agent configured to reject it, confirm the resulting error message reflects `maybe_wrap_session_control_error`'s wrapping, not the raw JSON-RPC error; (d) create a session with `session_options.model` set, confirm (via fake-agent RPC logging) the model-setting RPC was actually sent and the record's current-model-id reflects the response; (e) create a fresh session where the fake agent's `session/new` response omits `config_options` after an earlier connection had some — confirm the stale value is cleared; (f) load a session with the fake agent's `_meta.models` legacy shape (extend the fixture if needed) — confirm `model_state_from_session_response`'s legacy fallback actually populates model state.
-12. `cargo fmt -p boltz-acp`, `cargo check -p boltz-acp --all-targets --features test-support`, `cargo test -p boltz-acp --features test-support`, `make check-all`.
+12. `cargo fmt -p boltz-acpx`, `cargo check -p boltz-acpx --all-targets --features test-support`, `cargo test -p boltz-acpx --features test-support`, `make check-all`.
 13. Update `plans/20260705-1718-acpx-to-acp-crate-port/phase-04-runtime-engine-public-contract.md` per plan.md's housekeeping (gaps 9, 12, 15, 16).
 
 ## Todo list
@@ -128,7 +128,7 @@ crates/acp/src/
 - A rejected `set_session_mode` call surfaces a message distinguishably different from the raw JSON-RPC error (contains the "for mode ..." context acpx adds), provable by string-matching the returned error in a test.
 - A session created with `session_options.model` set ends up with the record's current-model-id matching what the fake agent's mocked response designates — not just that a config-option RPC was sent, but that the *result* was applied.
 - A fresh-session-after-earlier-connection scenario proves stale `config_options` are cleared, not carried over.
-- `cargo test -p boltz-acp --features test-support` count grows, all green.
+- `cargo test -p boltz-acpx --features test-support` count grows, all green.
 
 ## Risk Assessment
 

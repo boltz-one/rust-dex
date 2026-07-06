@@ -2,7 +2,7 @@
 //! Phase 2 integration tests: spawn the real fake ACP agent binary
 //! (`tests/fixtures/fake_agent/main.rs`) as a subprocess and drive the
 //! handshake/shutdown lifecycle end to end over real ndjson stdio. No
-//! mocks — run with `cargo test -p boltz-acp --features test-support`.
+//! mocks — run with `cargo test -p boltz-acpx --features test-support`.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -23,7 +23,7 @@ fn spawn_handshake_and_shutdown() {
             args: &[],
             cwd: Path::new("/tmp"),
             env: &env,
-            client_name: "boltz-acp-test".to_string(),
+            client_name: "boltz-acpx-test".to_string(),
             terminal: true,
             is_gemini: false,
             is_devin: false,
@@ -50,7 +50,7 @@ fn sigterm_ignoring_agent_escalates_to_sigkill() {
             args: &[],
             cwd: Path::new("/tmp"),
             env: &env,
-            client_name: "boltz-acp-test".to_string(),
+            client_name: "boltz-acpx-test".to_string(),
             terminal: false,
             is_gemini: false,
             is_devin: false,
@@ -74,7 +74,7 @@ fn session_new_returns_typed_response() {
             args: &[],
             cwd: Path::new("/tmp"),
             env: &env,
-            client_name: "boltz-acp-test".to_string(),
+            client_name: "boltz-acpx-test".to_string(),
             terminal: false,
             is_gemini: false,
             is_devin: false,
@@ -114,7 +114,7 @@ fn devin_spawn_advertises_windsurf_client_identity() {
             args: &[],
             cwd: Path::new("/tmp"),
             env: &env,
-            client_name: "boltz-acp-test".to_string(),
+            client_name: "boltz-acpx-test".to_string(),
             terminal: false,
             is_gemini: false,
             is_devin: true,
@@ -176,7 +176,7 @@ fn gemini_startup_timeout_kills_hung_agent_and_reports_diagnostic() {
             args: &[],
             cwd: Path::new("/tmp"),
             env: &env,
-            client_name: "boltz-acp-test".to_string(),
+            client_name: "boltz-acpx-test".to_string(),
             terminal: false,
             is_gemini: true,
             is_devin: false,
@@ -208,7 +208,7 @@ fn non_devin_spawn_advertises_real_client_identity() {
             args: &[],
             cwd: Path::new("/tmp"),
             env: &env,
-            client_name: "boltz-acp-test".to_string(),
+            client_name: "boltz-acpx-test".to_string(),
             terminal: false,
             is_gemini: false,
             is_devin: false,
@@ -226,7 +226,7 @@ fn non_devin_spawn_advertises_real_client_identity() {
         let echoed_client_info = meta
             .get("echoClientInfo")
             .expect("echoClientInfo should be present");
-        assert_eq!(echoed_client_info["name"], "boltz-acp-test");
+        assert_eq!(echoed_client_info["name"], "boltz-acpx-test");
         assert!(
             meta.get("echoClientCapabilities")
                 .unwrap()
@@ -258,7 +258,7 @@ fn authenticate_selects_advertised_method_when_credential_present() {
             args: &[],
             cwd: Path::new("/tmp"),
             env: &env,
-            client_name: "boltz-acp-test".to_string(),
+            client_name: "boltz-acpx-test".to_string(),
             terminal: false,
             is_gemini: false,
             is_devin: false,
@@ -305,7 +305,7 @@ fn authenticate_skipped_when_no_credential_resolves() {
             args: &[],
             cwd: Path::new("/tmp"),
             env: &env,
-            client_name: "boltz-acp-test".to_string(),
+            client_name: "boltz-acpx-test".to_string(),
             terminal: false,
             is_gemini: false,
             is_devin: false,

@@ -90,7 +90,7 @@ pub fn export_session(
     let exported = ExportedSession {
         format_version: 1,
         exported_at: crate::session::conversation_model::iso_now(),
-        exported_by: "boltz-acp".to_string(),
+        exported_by: "boltz-acpx".to_string(),
         session: ExportedSessionInfo {
             record_id: record.acpx_record_id.clone(),
             name: record.name.clone(),

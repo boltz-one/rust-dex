@@ -122,9 +122,9 @@ Existing ADR-1 through ADR-6 (`docs/decisions/0001-0006*.md`) are unaffected —
 ## Verification (every phase, after implementation)
 
 ```
-cargo fmt -p boltz-acp
-cargo check -p boltz-acp --all-targets --features test-support
-cargo test -p boltz-acp --features test-support   # must not regress below 274; each phase should grow it
+cargo fmt -p boltz-acpx
+cargo check -p boltz-acpx --all-targets --features test-support
+cargo test -p boltz-acpx --features test-support   # must not regress below 274; each phase should grow it
 make check-all
 ```
 

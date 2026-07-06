@@ -75,7 +75,7 @@ No cross-phase ADR needed for gaps 28/29 (direct, unambiguous ports of already-s
 6. Add `older_than_ms: Option<u64>` to `PruneOptions`; at the point prune logic reads `before`, if `older_than_ms` is set and `before` is not, compute an equivalent cutoff (current time minus `older_than_ms`) — confirm exact timestamp type/format used elsewhere in the prune logic for consistency.
 7. Unit tests: shutdown delay actually elapses before SIGTERM for a Qoder-detected command (and doesn't for a non-Qoder command, matching the default); `close_session`'s signal-candidate list for all 3 `last_agent_exit_signal` cases (`None`, `Some("SIGKILL")`, `Some("SIGTERM")` or other); `PruneOptions::older_than_ms`'s cutoff conversion.
 8. Real call-path integration test: spawn a fake agent under a command name that triggers Qoder detection (or a test-only override if the detection is strictly basename-based and the fake-agent binary's name can't easily be changed — check `resolve_agent_close_after_stdin_end_ms`'s exact matching rule first), shut it down, confirm (via timing or a fake-agent-side log of when SIGTERM was received relative to stdin closing) the delay was actually applied.
-9. `cargo fmt -p boltz-acp`, `cargo check -p boltz-acp --all-targets --features test-support`, `cargo test -p boltz-acp --features test-support`, `make check-all`.
+9. `cargo fmt -p boltz-acpx`, `cargo check -p boltz-acpx --all-targets --features test-support`, `cargo test -p boltz-acpx --features test-support`, `make check-all`.
 10. Update `plans/20260705-1718-acpx-to-acp-crate-port/phase-02-protocol-transport-lifecycle.md` (gaps 22,26) and `phase-05-session-persistence.md` (gaps 28,29) per plan.md's housekeeping.
 
 ## Todo list

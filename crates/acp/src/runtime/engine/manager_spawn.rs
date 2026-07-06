@@ -201,7 +201,7 @@ pub(super) async fn spawn_connected_session(
         args: &parts.args,
         cwd: &cwd,
         env: &env,
-        client_name: "boltz-acp".to_string(),
+        client_name: "boltz-acpx".to_string(),
         terminal: options.terminal,
         is_gemini,
         is_devin,

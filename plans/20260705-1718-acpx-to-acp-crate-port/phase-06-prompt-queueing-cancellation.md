@@ -72,7 +72,7 @@ crates/acp/src/perf_metrics.rs   # stretch goal, feature-gated: cargo feature "p
 7. Wire `SessionPromptQueue` into Phase 4's `AcpRuntime::start_turn` as the actual entry point (Phase 4's `prompt_turn::run_turn` becomes an implementation detail the dispatcher calls, not something external callers invoke directly anymore — may require a small Phase 4 API adjustment; flag this explicitly to whoever reviews Phase 4 if it's already "done" by the time this phase starts).
 8. (Stretch) Port `perf_metrics.rs`/`perf_metrics_capture.rs` behind a `perf-metrics` Cargo feature, off by default — counters/timings/gauges snapshot matching acpx's `PerfMetricsSnapshot` shape, useful for later profiling but not required for correctness.
 9. Integration tests against the Phase 2 fake-agent binary: (a) two sessions' turns run concurrently and neither waits on the other (measure via timing or explicit synchronization points in the fake agent), (b) a second prompt on the same session while one is active gets queued and runs after the first completes, in submission order, (c) exceeding the bounded queue capacity on one session produces the documented backpressure error without affecting other sessions, (d) cancelling an active turn does not drop already-queued pending requests (per Step 6's default), (e) `session/update` notifications for one session are applied in arrival order even if two updates race at the transport layer.
-10. `cargo fmt`, `cargo check -p boltz-acp`, `make check-all`.
+10. `cargo fmt`, `cargo check -p boltz-acpx`, `make check-all`.
 
 ## Todo list
 
@@ -85,7 +85,7 @@ crates/acp/src/perf_metrics.rs   # stretch goal, feature-gated: cargo feature "p
 - [x] (Stretch, feature-gated) Port `perf_metrics.rs`/`perf_metrics_capture.rs`. — Done: `crates/acp/src/perf_metrics/{mod,capture}.rs`, behind Cargo feature `perf-metrics` (off by default); see Implementation status note for the one deliberate deviation (no global `process.once`/signal-hook installation).
 - [x] Integration tests: cross-session concurrency, same-session FIFO ordering, backpressure, cancel-vs-queue independence, update ordering.
 - [x] All new files < 200 lines (`queue/mod.rs` 162, `queue/session_queue.rs` 192, `queue/dispatcher.rs` 88). `manager.rs` (419) and `prompt_turn.rs` (417) grew past 200 lines from the small sanctioned additions on top of Phase 4's already-oversized files (370/393 lines before this phase) — not split further, consistent with Phases 3/4's own documented judgment calls.
-- [x] `cargo check -p boltz-acp`, `make check-all`, `cargo fmt --all -- --check` green.
+- [x] `cargo check -p boltz-acpx`, `make check-all`, `cargo fmt --all -- --check` green.
 
 ## Success Criteria
 

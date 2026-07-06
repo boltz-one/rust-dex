@@ -1,4 +1,4 @@
-# Goal: Port acpx (TS) → `crates/acp` (boltz-acp)
+# Goal: Port acpx (TS) → `crates/acp` (boltz-acpx)
 
 ## Mission
 Port the Core+persistence+queueing slice of `others/acpx` (TS ACP CLI) into a new Rust crate `crates/acp`, embeddable by this GPUI app, following the 6-phase plan below. Done = all 6 phases implemented, each phase's Success Criteria passes, `make check-all` green.
@@ -12,7 +12,7 @@ Port the Core+persistence+queueing slice of `others/acpx` (TS ACP CLI) into a ne
 
 ## Requirements
 **Must do:**
-- Register `crates/acp` (package `boltz-acp`) in root `[workspace.members]`; follow `boltz-*` Cargo.toml conventions (see `crates/scheduler`, `crates/http_client`).
+- Register `crates/acp` (package `boltz-acpx`) in root `[workspace.members]`; follow `boltz-*` Cargo.toml conventions (see `crates/scheduler`, `crates/http_client`).
 - ADR-1: reuse `agent-client-protocol`/`agent-client-protocol-schema` crates; hand-roll only `session/set_mode`, `session/set_config_option`, `terminal/release`.
 - ADR-2/3: async substrate = `smol`, subprocess via `boltz-util::command`/`process` (already smol-based). No tokio, no new executor.
 - ADR-4: per-session single-flight prompt queue (not global).
@@ -25,7 +25,7 @@ Port the Core+persistence+queueing slice of `others/acpx` (TS ACP CLI) into a ne
 - Do not introduce tokio or any executor beyond `smol`.
 
 ## Success Criteria
-- `cargo check -p boltz-acp` and `make check-all` pass, zero warnings from new code.
+- `cargo check -p boltz-acpx` and `make check-all` pass, zero warnings from new code.
 - Phase 2: real subprocess integration test proves spawn→initialize→shutdown and SIGTERM→SIGKILL escalation.
 - Phase 3: permission decision-tree tests cover all mode×policy combos; fs sandbox rejects path traversal; terminal kill verified via `is_process_alive`.
 - Phase 4: simulated host consumer drives `ensure_session`→`start_turn`→event stream→result against the Phase-2 fake agent; reconnect-after-crash test passes.
@@ -40,8 +40,8 @@ Port the Core+persistence+queueing slice of `others/acpx` (TS ACP CLI) into a ne
 
 ## Verification
 ```bash
-cargo check -p boltz-acp
-cargo test -p boltz-acp
+cargo check -p boltz-acpx
+cargo test -p boltz-acpx
 cargo fmt --all -- --check
 make check-all
 ```

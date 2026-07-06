@@ -112,7 +112,7 @@ mod tests {
 
     fn minimal_record_json() -> serde_json::Value {
         serde_json::json!({
-            "schema": "boltz-acp.session.v1",
+            "schema": "boltz-acpx.session.v1",
             "acpx_record_id": "r1",
             "acp_session_id": "s1",
             "agent_command": "claude",

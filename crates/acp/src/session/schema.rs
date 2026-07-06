@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 /// The persisted `schema` tag on every [`super::record::SessionRecord`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SessionSchemaVersion {
-    #[serde(rename = "boltz-acp.session.v1")]
+    #[serde(rename = "boltz-acpx.session.v1")]
     V1,
 }
 
@@ -27,7 +27,7 @@ impl SessionSchemaVersion {
     /// against it without round-tripping through `serde_json`.
     pub const fn as_str(self) -> &'static str {
         match self {
-            SessionSchemaVersion::V1 => "boltz-acp.session.v1",
+            SessionSchemaVersion::V1 => "boltz-acpx.session.v1",
         }
     }
 }
@@ -46,7 +46,7 @@ mod tests {
     fn serializes_to_namespaced_tag() {
         assert_eq!(
             serde_json::to_string(&SessionSchemaVersion::V1).unwrap(),
-            "\"boltz-acp.session.v1\""
+            "\"boltz-acpx.session.v1\""
         );
     }
 

@@ -45,7 +45,7 @@ pub(crate) mod test_support {
     /// A [`SessionRecord`] exercising every message/content variant, used by
     /// round-trip and persisted-key-policy regression tests.
     pub(crate) fn sample_session_record() -> SessionRecord {
-        let options = AcpFileSessionStoreOptions::new("/tmp/boltz-acp-test");
+        let options = AcpFileSessionStoreOptions::new("/tmp/boltz-acpx-test");
         let mut tool_results = HashMap::new();
         tool_results.insert(
             "call-1".to_string(),
@@ -129,7 +129,7 @@ mod tests {
     fn forces_canonical_schema_and_trims_agent_session_id() {
         let record = test_support::sample_session_record();
         let value = serialize_session_record_for_disk(&record);
-        assert_eq!(value["schema"], "boltz-acp.session.v1");
+        assert_eq!(value["schema"], "boltz-acpx.session.v1");
         assert_eq!(value["agent_session_id"], "agent-session-1");
     }
 

@@ -92,7 +92,7 @@ tests/
 8. For gap 6: in `prompt_turn/mod.rs`, capture `record_prompt_submission`'s returned message id (currently discarded at L92) into a local binding, thread it into the `run_turn_task` call/struct that eventually reaches `task.rs`. In `task.rs`'s timeout branch (L69-76), before constructing `turn_result_from_timeout`, lock `connected.conversation` and call `has_agent_reply_after_prompt(&conversation, &prompt_message_id)`; if true, construct the equivalent of a successful/`end_turn` `TurnResult` (reuse `turn_result_from_stop_reason` with the right stop-reason string, or add a small dedicated constructor if the existing one doesn't fit — check `turn_result.rs`'s exact shape first) instead of `turn_result_from_timeout`.
 9. Resolve the idle-drain-wait ADR question during implementation (see ADR above) — document the actual approach taken in this file once decided.
 10. Integration test for gap 6: fake agent configured to respond to `session/prompt` with a delay exceeding a short test timeout, but to still emit a `session/update` (via the existing `ACP_FAKE_AGENT_PROMPT_UPDATE_COUNT` toggle) before that delay elapses — confirm the turn reports success/`end_turn`, not `Failed{code:"TIMEOUT"}`. A second test: fake agent times out with **no** update sent at all — confirm the turn still reports `Failed{code:"TIMEOUT"}` (regression guard, the fix must not turn ALL timeouts into false successes).
-11. `cargo fmt -p boltz-acp`, `cargo check -p boltz-acp --all-targets --features test-support`, `cargo test -p boltz-acp --features test-support`, `make check-all`.
+11. `cargo fmt -p boltz-acpx`, `cargo check -p boltz-acpx --all-targets --features test-support`, `cargo test -p boltz-acpx --features test-support`, `make check-all`.
 12. Update `plans/20260705-1718-acpx-to-acp-crate-port/phase-04-runtime-engine-public-contract.md` (gap 6) and `phase-02-protocol-transport-lifecycle.md` (gap 4) per plan.md's housekeeping.
 
 ## Todo list
@@ -116,7 +116,7 @@ tests/
 - The rollback test (Step 7e) proves record state is genuinely restored on replay failure, not just that an error is returned.
 - The Claude timeout test (Step 7f) proves the resulting error is specifically `AcpError::ClaudeAcpSessionCreateTimeout` with a message mentioning the diagnostic guidance acpx's `buildClaudeAcpSessionCreateTimeoutMessage` provides (approve-all / nonInteractivePermissions=deny / fallback guidance) — not a generic timeout error.
 - The timeout-reply-check test (Step 10) proves a turn that times out at the RPC level but already received a `session/update` reports success, while a genuinely silent timeout still reports failure (both directions tested, not just the happy path).
-- `cargo test -p boltz-acp --features test-support` passes, count grows from 274 by roughly the number of new tests added in this phase.
+- `cargo test -p boltz-acpx --features test-support` passes, count grows from 274 by roughly the number of new tests added in this phase.
 
 ## Risk Assessment
 

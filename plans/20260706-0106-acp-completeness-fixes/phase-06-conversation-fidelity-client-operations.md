@@ -88,7 +88,7 @@ crates/acp/src/
 8. Wire both new callbacks into the runtime-engine layer: the callback calls `record_client_operation(&mut conversation, ...)` (finally giving it a call site) AND forwards the operation as an `AcpRuntimeEvent::ClientOperation` into the active turn's event stream, matching acpx's `manager.ts:1101-1109`'s dual behavior (persisted + streamed).
 9. Unit tests: `trim.rs`'s string-output truncation (and non-string output left untouched); `to_raw_input`'s string vs. non-string paths (a string input round-trips without extra quotes; a JSON object still gets `JSON.stringify`-equivalent encoding); `apply_tool_call_update`'s is_error reset (a title-only update after a prior error-flagged update clears `is_error` to `false`, matching ADR-9).
 10. Real call-path integration test: drive a real fs/terminal operation through the fake-agent-backed test harness (a filesystem read/write and/or a terminal command), confirm an `AcpRuntimeEvent::ClientOperation` event is actually observed in the turn's event stream and `record_client_operation` was actually invoked (assert on the conversation's `updated_at` timestamp changing or an equivalent observable side effect), not just that the pure callback-wiring compiles.
-11. `cargo fmt -p boltz-acp`, `cargo check -p boltz-acp --all-targets --features test-support`, `cargo test -p boltz-acp --features test-support`, `make check-all`.
+11. `cargo fmt -p boltz-acpx`, `cargo check -p boltz-acpx --all-targets --features test-support`, `cargo test -p boltz-acpx --features test-support`, `make check-all`.
 12. Update `plans/20260705-1718-acpx-to-acp-crate-port/phase-05-session-persistence.md` (gaps 17,18,19) and `phase-04-runtime-engine-public-contract.md` (gap 20) per plan.md's housekeeping.
 
 ## Todo list

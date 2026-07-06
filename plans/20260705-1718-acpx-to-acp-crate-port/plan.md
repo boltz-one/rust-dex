@@ -1,6 +1,6 @@
 ---
 title: "Port acpx (TS) core + persistence + queueing into crates/acp"
-description: "Port scoped ACP client/runtime/session-persistence logic from others/acpx into a new boltz-acp Rust crate, embeddable in the GPUI desktop app."
+description: "Port scoped ACP client/runtime/session-persistence logic from others/acpx into a new boltz-acpx Rust crate, embeddable in the GPUI desktop app."
 status: done
 priority: P1
 effort: 53h
@@ -10,12 +10,12 @@ tags: [acp, agent-client-protocol, rust-port, session-persistence, gpui]
 created: 2026-07-05
 ---
 
-# Plan: Port acpx → `crates/acp` (boltz-acp)
+# Plan: Port acpx → `crates/acp` (boltz-acpx)
 
 ## Scope
 
 Port the **Core + session persistence + queueing** slice of `others/acpx` (TS) into a new
-Rust crate `crates/acp` (published as `boltz-acp`), embeddable by the GPUI desktop app.
+Rust crate `crates/acp` (published as `boltz-acpx`), embeddable by the GPUI desktop app.
 Full scope/out-of-scope list, target-crate facts, and required ADR topics are in the
 orchestrator brief this plan was generated from — repeated at the top of each phase file's
 Context section. Out of scope: `cli*`, `cli/`, `flows*`, `conformance/`, `examples/`, `scripts/`.

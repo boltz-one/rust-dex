@@ -105,7 +105,7 @@ mod tests {
         ExportedSession {
             format_version: 1,
             exported_at: "2026-01-01T00:00:00Z".to_string(),
-            exported_by: "boltz-acp".to_string(),
+            exported_by: "boltz-acpx".to_string(),
             session: ExportedSessionInfo {
                 record_id: "record-1".to_string(),
                 name: None,

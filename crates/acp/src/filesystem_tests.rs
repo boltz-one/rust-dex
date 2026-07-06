@@ -1,7 +1,7 @@
 use super::*;
 
 fn tempdir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("boltz-acp-fs-test-{}", uuid::Uuid::new_v4()));
+    let dir = std::env::temp_dir().join(format!("boltz-acpx-fs-test-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -76,7 +76,7 @@ fn deny_all_mode_rejects_read() {
 fn traversal_outside_root_is_rejected() {
     smol::block_on(async {
         let root = tempdir();
-        let outside = std::env::temp_dir().join("boltz-acp-fs-outside.txt");
+        let outside = std::env::temp_dir().join("boltz-acpx-fs-outside.txt");
         std::fs::write(&outside, "secret").unwrap();
         let handlers = FilesystemHandlers::new(
             &root,
@@ -86,7 +86,7 @@ fn traversal_outside_root_is_rejected() {
         )
         .unwrap();
 
-        let traversal_path = root.join("../boltz-acp-fs-outside.txt");
+        let traversal_path = root.join("../boltz-acpx-fs-outside.txt");
         let result = handlers
             .read_text_file(ReadTextFileRequest::new("s1", traversal_path))
             .await;

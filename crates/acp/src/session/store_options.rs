@@ -51,7 +51,7 @@ impl Default for AcpFileSessionStoreOptions {
         let base = dirs::state_dir()
             .or_else(dirs::data_dir)
             .unwrap_or_else(std::env::temp_dir);
-        Self::new(base.join("boltz-acp"))
+        Self::new(base.join("boltz-acpx"))
     }
 }
 

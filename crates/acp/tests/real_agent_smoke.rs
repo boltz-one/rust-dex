@@ -12,7 +12,7 @@
 //! actually talks to real Claude:
 //!
 //! ```sh
-//! cargo test -p boltz-acp --features test-support --test real_agent_smoke \
+//! cargo test -p boltz-acpx --features test-support --test real_agent_smoke \
 //!     -- --ignored --nocapture
 //! ```
 

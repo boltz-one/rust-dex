@@ -9,15 +9,15 @@
 ## Overview
 
 - **Date:** 2026-07-05
-- **Description:** Stand up the `crates/acp` crate skeleton (published as `boltz-acp`), register it in the workspace, pin its dependency set, and land the foundational error/type/control modules every later phase imports. No protocol logic yet.
+- **Description:** Stand up the `crates/acp` crate skeleton (published as `boltz-acpx`), register it in the workspace, pin its dependency set, and land the foundational error/type/control modules every later phase imports. No protocol logic yet.
 - **Priority:** P1 (blocks all other phases)
-- **Implementation status:** Done — `cargo check -p boltz-acp`, `cargo test -p boltz-acp` (7 passed), `make check-all`, `cargo fmt --all -- --check` all green. Lib entry file confirmed as `src/acp.rs` (matches `http_client`/`scheduler`/`theme` convention). Pinned `agent-client-protocol = "=1.0.1"`, `agent-client-protocol-schema = "=1.2.0"` in workspace deps (not yet used by crate code — Phase 2 will add them to `crates/acp/Cargo.toml`'s `[dependencies]` when first consumed, avoiding an unused-dependency warning window).
+- **Implementation status:** Done — `cargo check -p boltz-acpx`, `cargo test -p boltz-acpx` (7 passed), `make check-all`, `cargo fmt --all -- --check` all green. Lib entry file confirmed as `src/acp.rs` (matches `http_client`/`scheduler`/`theme` convention). Pinned `agent-client-protocol = "=1.0.1"`, `agent-client-protocol-schema = "=1.2.0"` in workspace deps (not yet used by crate code — Phase 2 will add them to `crates/acp/Cargo.toml`'s `[dependencies]` when first consumed, avoiding an unused-dependency warning window).
 - **Review status:** Not reviewed
 
 ## Key Insights
 
 - `crates/acp/Cargo.toml` exists but is 0 bytes — bare scaffold, no `[package]` section. `crates/acp` is **not** in root `Cargo.toml` `[workspace.members]`.
-- Naming convention (verified against `crates/scheduler/Cargo.toml`, `crates/http_client/Cargo.toml`): crate dir `acp`, package name `boltz-acp`, `edition.workspace = true`, `publish = true`, `license = "Apache-2.0"`, `repository.workspace = true`, `[lints] workspace = true`.
+- Naming convention (verified against `crates/scheduler/Cargo.toml`, `crates/http_client/Cargo.toml`): crate dir `acp`, package name `boltz-acpx`, `edition.workspace = true`, `publish = true`, `license = "Apache-2.0"`, `repository.workspace = true`, `[lints] workspace = true`.
 - `agent-client-protocol` and `agent-client-protocol-schema` (crates.io, github.com/agentclientprotocol/rust-sdk) are **not yet** in `[workspace.dependencies]` — must be added here since acpx's protocol types get reused via ADR-1 (Phase 2), and the schema crate is needed even before Phase 2 lands so `types.rs`/`error.rs` can reference its enums where they overlap (e.g. `ToolKind`, `StopReason`).
 - Workspace already carries `smol = "2.0"`, `futures = "0.3.32"`, `futures-lite = "1.13"`, `parking_lot`, `thiserror = "2.0.12"`, `anyhow`, `serde`/`serde_json`, `chrono`, `uuid`, `dirs`, `tempfile` — all reusable, no new workspace deps needed for these.
 - `crates/util` (`boltz-util`) already vendors a cross-platform subprocess abstraction (`src/command.rs`, `src/command/darwin.rs`, `src/process.rs`) built on `smol::process`, including the macOS `posix_spawn` quirk isolated behind a facade. `acp` should depend on `util` from Phase 2 onward rather than re-implementing spawn/kill — flagged here so the Cargo.toml dependency list is correct from the start.
@@ -27,7 +27,7 @@
 
 1. `crates/acp/Cargo.toml` fully populated per workspace convention, added to root `[workspace.members]` and `[workspace.dependencies]`.
 2. `agent-client-protocol` + `agent-client-protocol-schema` added to `[workspace.dependencies]` at the version used by Zed's current release (verify latest on crates.io at implementation time — do not hardcode a stale version into the plan).
-3. Crate compiles standalone (`cargo check -p boltz-acp`) with only foundational modules (no protocol logic): `lib.rs`, `error.rs`, `types.rs`, `control.rs`, `platform/` (empty scaffolds with doc comments describing what Phase 2/3 will add).
+3. Crate compiles standalone (`cargo check -p boltz-acpx`) with only foundational modules (no protocol logic): `lib.rs`, `error.rs`, `types.rs`, `control.rs`, `platform/` (empty scaffolds with doc comments describing what Phase 2/3 will add).
 4. `[features] test-support = []` feature flag defined (matches `http_client`/`scheduler` pattern) for later test-only fake-agent binary wiring (Phase 2+).
 5. `make check-all` still passes after the crate is added (verify no dependency version conflicts).
 
@@ -61,7 +61,7 @@ crates/acp/
 ## Related code files
 
 - `crates/acp/Cargo.toml` (currently 0 bytes) — to be filled in this phase.
-- `Cargo.toml` (root) — add `"crates/acp"` to `[workspace.members]`, add `acp = { path = "crates/acp", version = "0.1.0", package = "boltz-acp" }` and `agent-client-protocol`/`agent-client-protocol-schema` to `[workspace.dependencies]`.
+- `Cargo.toml` (root) — add `"crates/acp"` to `[workspace.members]`, add `acp = { path = "crates/acp", version = "0.1.0", package = "boltz-acpx" }` and `agent-client-protocol`/`agent-client-protocol-schema` to `[workspace.dependencies]`.
 - Reference for Cargo.toml shape: `crates/http_client/Cargo.toml`, `crates/scheduler/Cargo.toml`.
 - Reference for platform isolation pattern: `crates/gpui_platform/src/gpui_platform.rs`, `crates/util/src/command/darwin.rs`.
 - Source to port: `others/acpx/src/types.ts` (470 lines, partial — CLI-only types excluded), `others/acpx/src/errors.ts` (220 lines), `others/acpx/src/async-control.ts` (81 lines), `others/acpx/src/process-liveness.ts` (12 lines).
@@ -77,7 +77,7 @@ crates/acp/
 7. Write `crates/acp/Cargo.toml`:
    ```toml
    [package]
-   name = "boltz-acp"
+   name = "boltz-acpx"
    version = "0.1.0"
    edition.workspace = true
    publish = true
@@ -108,8 +108,8 @@ crates/acp/
    smol.workspace = true
    ```
    (NOTE: check whether sibling crates name their lib entry file `src/<crate>.rs` — e.g. `http_client` uses `src/http_client.rs`, `scheduler` uses `src/scheduler.rs` — this workspace's convention deviates from the `src/lib.rs` default. Follow that convention: `src/acp.rs`, not `src/lib.rs`. Update all file paths in this plan's "Architecture" tree accordingly at implementation time — `lib.rs` mentioned above is a placeholder name only.)
-8. Add `agent-client-protocol` / `agent-client-protocol-schema` to root `Cargo.toml` `[workspace.dependencies]` at latest crates.io version, and `"crates/acp"` to `[workspace.members]` + `acp = { path = "crates/acp", ... package = "boltz-acp" }` to `[workspace.dependencies]`.
-9. Run `cargo check -p boltz-acp` and `make check-all`; fix any workspace dependency-resolution conflicts.
+8. Add `agent-client-protocol` / `agent-client-protocol-schema` to root `Cargo.toml` `[workspace.dependencies]` at latest crates.io version, and `"crates/acp"` to `[workspace.members]` + `acp = { path = "crates/acp", ... package = "boltz-acpx" }` to `[workspace.dependencies]`.
+9. Run `cargo check -p boltz-acpx` and `make check-all`; fix any workspace dependency-resolution conflicts.
 10. `cargo fmt --all -- --check`.
 
 ## Todo list
@@ -120,13 +120,13 @@ crates/acp/
 - [ ] Add `agent-client-protocol` + `agent-client-protocol-schema` to root `Cargo.toml` workspace dependencies (pin exact version used).
 - [ ] Write `error.rs`, `types.rs`, `control.rs`, `platform/mod.rs`, `platform/liveness.rs`.
 - [ ] Write crate-root doc comment in the lib entry file.
-- [ ] `cargo check -p boltz-acp` passes.
+- [ ] `cargo check -p boltz-acpx` passes.
 - [ ] `make check-all` passes (no cross-crate breakage).
 - [ ] `cargo fmt --all -- --check` passes.
 
 ## Success Criteria
 
-- `cargo check -p boltz-acp` succeeds with zero warnings from the new code.
+- `cargo check -p boltz-acpx` succeeds with zero warnings from the new code.
 - `make check-all` succeeds (workspace-wide, confirms no dependency conflicts introduced by adding `agent-client-protocol`).
 - Every file in `crates/acp/src/` is under 200 lines.
 - No `#[cfg(target_os)]` outside `crates/acp/src/platform/`.
@@ -143,5 +143,5 @@ crates/acp/
 
 ## Next steps
 
-- Proceed to [Phase 2](./phase-02-protocol-transport-lifecycle.md) once `cargo check -p boltz-acp` is green.
+- Proceed to [Phase 2](./phase-02-protocol-transport-lifecycle.md) once `cargo check -p boltz-acpx` is green.
 - Open question carried forward: **error-handling strategy** (`thiserror` enum vs `anyhow`) — this phase assumes `thiserror` for the public `AcpError` type per the plan's proposed default; get explicit user confirmation before Phase 2 builds on it, since reversing it later touches every phase.

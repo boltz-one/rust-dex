@@ -57,10 +57,10 @@ Rust's `serde` gives most of these guarantees structurally, but they must be
 ## Consequences
 
 - Session files are not byte-compatible with acpx's `~/.acpx/sessions/*.json`
-  — this is a new format (`boltz-acp.session.v1`), not a shared one; no
+  — this is a new format (`boltz-acpx.session.v1`), not a shared one; no
   migration path from existing acpx session files was implemented or
   requested.
-- The default session-storage root is `dirs::state_dir()/boltz-acp`, deliberately
+- The default session-storage root is `dirs::state_dir()/boltz-acpx`, deliberately
   distinct from acpx's `.acpx` naming to avoid cross-tool confusion if both
   are installed on the same machine, and is exposed as a configurable field
   (`AcpFileSessionStoreOptions`-equivalent) rather than hardcoded.

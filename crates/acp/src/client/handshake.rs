@@ -165,7 +165,7 @@ async fn authenticate_if_required(
 
 /// Performs the `initialize` handshake over `transport` and leaves the
 /// connection running in the background. `client_name` is this crate's
-/// advertised `clientInfo.name` (e.g. `"boltz-acp"` or an app-provided
+/// advertised `clientInfo.name` (e.g. `"boltz-acpx"` or an app-provided
 /// override); `terminal` advertises `terminal/*` capability support;
 /// `is_devin` swaps the advertised `clientInfo`/`clientCapabilities` for
 /// Devin's Windsurf compatibility identity (see this module's docs above);
@@ -561,14 +561,14 @@ mod tests {
 
     #[test]
     fn client_info_reports_real_identity_by_default() {
-        let info = client_info("boltz-acp".to_string(), false);
-        assert_eq!(info.name, "boltz-acp");
+        let info = client_info("boltz-acpx".to_string(), false);
+        assert_eq!(info.name, "boltz-acpx");
         assert_eq!(info.version, crate_version());
     }
 
     #[test]
     fn client_info_spoofs_windsurf_identity_for_devin() {
-        let info = client_info("boltz-acp".to_string(), true);
+        let info = client_info("boltz-acpx".to_string(), true);
         assert_eq!(info.name, DEVIN_COMPATIBILITY_CLIENT_NAME);
         assert_eq!(info.version, DEFAULT_DEVIN_COMPATIBILITY_CLIENT_VERSION);
     }

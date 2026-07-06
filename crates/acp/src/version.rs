@@ -7,7 +7,7 @@
 //! is the direct Rust equivalent — there is no analogous "found the wrong
 //! nested package.json" failure mode to guard against.
 
-/// The `boltz-acp` crate version, e.g. `"0.1.0"`.
+/// The `boltz-acpx` crate version, e.g. `"0.1.0"`.
 pub const ACP_CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Returns [`ACP_CRATE_VERSION`]. Kept as a function (rather than requiring

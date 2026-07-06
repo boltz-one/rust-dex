@@ -77,7 +77,7 @@ pub async fn probe_runtime(options: &AcpRuntimeOptions) -> RuntimeHealthReport {
         args: &parts.args,
         cwd: Path::new(&options.cwd),
         env: &env,
-        client_name: "boltz-acp-probe".to_string(),
+        client_name: "boltz-acpx-probe".to_string(),
         terminal: options.terminal,
         is_gemini,
         is_devin,
