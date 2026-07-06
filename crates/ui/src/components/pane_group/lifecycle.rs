@@ -42,7 +42,7 @@ impl PaneGroup {
     /// own last tab is automatically removed from the tree.
     pub(super) fn watch_pane(pane: &Entity<Pane>, cx: &mut Context<Self>) -> Subscription {
         cx.subscribe(pane, |this, pane, event: &PaneEvent, cx| match event {
-            PaneEvent::Empty => {
+            PaneEvent::Empty | PaneEvent::CloseRequested => {
                 let _ = this.remove_pane(&pane, cx);
             }
         })

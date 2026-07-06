@@ -3,7 +3,7 @@
 
 use gpui::Empty;
 
-use super::Pane;
+use super::{Pane, PaneEvent};
 use crate::{IconButton, IconName, IconSize, Tab, TabBar, prelude::*};
 
 /// Bare `IconButton::new`'s own default `debug_selector` (`"ICON-{icon:?}"`)
@@ -35,15 +35,20 @@ impl Render for Pane {
             // hovers this specific tab (each tab is its own `group` scope, so
             // hovering one tab reveals only its own close button).
             let hover_group = SharedString::from(format!("pane-tab-{}", tab_id.0));
+            // VSCode behavior: the active tab always shows its close button;
+            // inactive tabs reveal it only on hover.
+            let mut close_ib = IconButton::new(("pane-tab-close", tab_id.0), IconName::Close)
+                .icon_size(IconSize::XSmall)
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.close_tab(ix, cx);
+                }));
+            if !selected {
+                close_ib = close_ib.visible_on_hover(hover_group.clone());
+            }
             let close_button = debug_wrap(
                 ("pane-tab-close-wrap", tab_id.0),
                 format!("PANE-TAB-CLOSE-{}", tab_id.0),
-                IconButton::new(("pane-tab-close", tab_id.0), IconName::Close)
-                    .icon_size(IconSize::XSmall)
-                    .visible_on_hover(hover_group.clone())
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.close_tab(ix, cx);
-                    })),
+                close_ib,
             );
 
             let tab = Tab::new(("pane-tab", tab_id.0))
@@ -77,6 +82,18 @@ impl Render for Pane {
                 .on_click(cx.listener(|this, _, _, cx| {
                     let content = (this.new_tab_factory)();
                     this.add_tab(content, cx);
+                })),
+        ));
+
+        // Close-pane "x" at the far right of the header — asks the parent
+        // PaneGroup to remove this whole pane (ignored if it is the last one).
+        tab_bar = tab_bar.end_child(debug_wrap(
+            "pane-close-wrap",
+            "PANE-CLOSE".to_string(),
+            IconButton::new("pane-close", IconName::Close)
+                .icon_size(IconSize::XSmall)
+                .on_click(cx.listener(|_, _, _, cx| {
+                    cx.emit(PaneEvent::CloseRequested);
                 })),
         ));
 

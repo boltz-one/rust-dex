@@ -49,6 +49,9 @@ pub enum PaneEvent {
     /// The last tab was just closed; `PaneGroup` should remove this pane
     /// from the split tree.
     Empty,
+    /// The pane's header close ("x") button was pressed; `PaneGroup` should
+    /// remove this whole pane (no-op if it is the last remaining pane).
+    CloseRequested,
 }
 
 /// Default content for tabs created via the "+" button when no factory was

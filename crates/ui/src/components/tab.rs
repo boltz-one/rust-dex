@@ -91,27 +91,33 @@ impl RenderOnce for Tab {
 
         match self.style {
             TabBarStyle::Underline => {
-                // Borderless: the active tab is indicated by a subtle rounded
-                // background + brighter text (no bottom-border underline), per
-                // the requested mockup.
-                let (text_color, bg) = if self.selected {
-                    (semantic::text(cx), semantic::active_bg(cx))
+                // VSCode-style tab: the active tab gets a top accent bar + a
+                // slightly elevated background + bright text; inactive tabs are
+                // flat/muted. Tabs sit flush, separated by a thin right divider.
+                // (Top accent, not a bottom border, per the requested look.)
+                let (text_color, bg, accent) = if self.selected {
+                    (
+                        semantic::text(cx),
+                        semantic::elevated_surface(cx),
+                        palette::primary(500),
+                    )
                 } else {
-                    (semantic::text_muted(cx), transparent_black())
+                    (
+                        semantic::text_muted(cx),
+                        transparent_black(),
+                        transparent_black(),
+                    )
                 };
                 let hover_color = semantic::text(cx);
 
-                // Fill the parent TabBar's fixed height and vertically center
-                // the label instead of setting a large fixed `py` (which made
-                // the tab taller than `TabBar`'s container height, overflowing
-                // and clipping the title at the top).
                 self.div
                     .h_full()
                     .flex()
                     .items_center()
                     .cursor_pointer()
-                    .px_2()
-                    .rounded_md()
+                    .px_3()
+                    .border_t_2()
+                    .border_color(accent)
                     .bg(bg)
                     .text_color(text_color)
                     .hover(move |this| this.text_color(hover_color))

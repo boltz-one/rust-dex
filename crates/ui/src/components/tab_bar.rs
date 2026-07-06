@@ -116,7 +116,8 @@ impl RenderOnce for TabBar {
             .id("tabs")
             .flex_grow()
             .overflow_x_scroll()
-            .when(style == TabBarStyle::Underline, |this| this.gap_2())
+            // Underline (VSCode-style) tabs sit flush with per-tab dividers;
+            // only the Pills style keeps an inter-tab gap.
             .when(style == TabBarStyle::Pills, |this| this.gap_2())
             .when_some(self.scroll_handle, |this, scroll_handle| {
                 this.track_scroll(&scroll_handle)
