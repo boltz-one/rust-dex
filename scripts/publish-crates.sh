@@ -64,6 +64,7 @@ PACKAGES=(
   boltz-component
   boltz-gpui-platform
   boltz-language
+  boltz-terminal
   boltz-ui
   boltz-app
   boltz-gpui-probe
