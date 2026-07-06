@@ -4,16 +4,28 @@
 //! for Windows `.cmd`/`.bat` wrapper scripts (npm-installed CLIs are
 //! frequently `.cmd` shims on Windows) because Node won't exec them
 //! directly. `util::command`/`util::process` (this crate's spawn primitive
-//! per ADR-3) has no such shell-wrapping concept, so [`ShellWrap`] reports
-//! *whether* wrapping is needed and [`wrap_for_windows_batch_shell`] does
-//! the wrapping at the `(program, args)` level instead of via a spawn-option
-//! flag.
+//! per ADR-3) has no such shell-wrapping concept, so [`should_use_windows_batch_shell`]
+//! reports *whether* wrapping is needed and callers (currently
+//! `terminal::spawn::spawn_terminal_process` via [`build_terminal_shell_spawn_command`],
+//! and `client::spawn::spawn_agent_process` for the real agent-spawn path)
+//! do the wrapping themselves at the `(program, args)` level instead of via
+//! a spawn-option flag.
 //!
-//! The npm-specific executable *resolution* helpers
-//! (`resolveWindowsExecutablePath`, wrapper-script `.exe` sniffing) are
-//! ported as pure, host-OS-independent string/byte functions so they're
-//! testable on macOS/Linux CI; they are only meaningful when actually
-//! spawning on Windows.
+//! The npm-specific executable *resolution* helper [`resolve_windows_command`]
+//! (PATHEXT-based candidate resolution) is ported as a pure,
+//! host-OS-independent function so it's testable on macOS/Linux CI; it is
+//! only meaningful when actually spawning on Windows.
+//!
+//! `resolveWindowsExecutablePath`'s wrapper-script-content-sniffing half
+//! (`resolveWindowsWrapperExecutable`/`resolveWindowsWrapperToken` — reading
+//! a `.cmd`/`.bat` file's *contents* to find an embedded `.exe` target when
+//! a naive PATHEXT lookup finds none) is **not** ported here — see ADR-10 in
+//! `plans/20260706-0106-acp-completeness-fixes/phase-07-windows-batch-shell-spawn.md`.
+//!
+// TODO(gap-21b, gap-27): port others/acpx/src/spawn-command-options.ts's
+// resolveWindowsWrapperExecutable/resolveWindowsWrapperToken and
+// others/acpx/src/acp/agent-command.ts's resolveClaudeCodeExecutable once
+// real Windows test infrastructure is available.
 
 use std::path::{Path, PathBuf};
 

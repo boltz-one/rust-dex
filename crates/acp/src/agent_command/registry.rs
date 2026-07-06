@@ -12,6 +12,8 @@
 
 use std::collections::HashMap;
 
+use super::codex_compat::is_legacy_zed_codex_acp_invocation;
+
 /// Default agent when none is specified. Mirrors acpx's `DEFAULT_AGENT_NAME`.
 pub const DEFAULT_AGENT_NAME: &str = "codex";
 
@@ -106,6 +108,30 @@ pub fn list_built_in_agents(overrides: Option<&HashMap<String, String>>) -> Vec<
     names
 }
 
+/// Ports `resolveCompatibleConfigId` (`others/acpx/src/cli/command-handlers.ts`
+/// L166-170) — the one confirmed downstream consumer of gap-26's
+/// `is_legacy_zed_codex_acp_invocation` predicate (verified by reading
+/// `others/acpx/src/acp/codex-compat.ts`'s call sites): the legacy
+/// `@zed-industries/codex-acp` package renamed its `thought_level` session
+/// config option to `reasoning_effort`, so a `session/set_config_option`
+/// call using the old id against a legacy-invoked codex-acp agent gets
+/// silently remapped to the id that agent actually understands.
+///
+/// Note: `is_codex_acp_command` (also gap 26, `codex_compat.rs`) has no
+/// downstream consumer anywhere in acpx itself (verified: it has zero call
+/// sites outside its own definition and tests in `others/acpx/src/`), so
+/// there is no acpx-specified behavior to port for it — wiring it in here
+/// would mean inventing behavior acpx doesn't have. Left unwired, per this
+/// phase's Requirement 4/Risk Assessment guidance to avoid dead wiring
+/// masquerading as a real behavior change.
+pub fn resolve_compatible_config_id(agent_command: &str, config_id: &str) -> String {
+    if is_legacy_zed_codex_acp_invocation(agent_command) && config_id == "thought_level" {
+        "reasoning_effort".to_string()
+    } else {
+        config_id.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,5 +169,32 @@ mod tests {
     #[test]
     fn default_agent_name_is_registered() {
         assert!(built_in_agent_registry().contains_key(DEFAULT_AGENT_NAME));
+    }
+
+    #[test]
+    fn legacy_zed_codex_acp_remaps_thought_level_config_id() {
+        assert_eq!(
+            resolve_compatible_config_id("npx -y @zed-industries/codex-acp@0.1.0", "thought_level"),
+            "reasoning_effort"
+        );
+    }
+
+    #[test]
+    fn modern_codex_acp_does_not_remap_config_id() {
+        assert_eq!(
+            resolve_compatible_config_id(
+                "npx -y @agentclientprotocol/codex-acp@^0.0.44",
+                "thought_level"
+            ),
+            "thought_level"
+        );
+    }
+
+    #[test]
+    fn legacy_zed_codex_acp_only_remaps_thought_level() {
+        assert_eq!(
+            resolve_compatible_config_id("npx -y @zed-industries/codex-acp@0.1.0", "model"),
+            "model"
+        );
     }
 }

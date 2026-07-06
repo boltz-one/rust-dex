@@ -697,6 +697,7 @@ dependencies = [
  "chrono",
  "dirs",
  "futures",
+ "indexmap 2.14.0",
  "libc",
  "log",
  "parking_lot",

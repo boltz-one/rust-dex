@@ -124,6 +124,17 @@ const QODER_BENIGN_STDOUT_LINES: [&str; 2] = [
 ];
 
 /// Ports `shouldIgnoreNonJsonAgentOutputLine`.
+///
+/// TODO(gap-22): this predicate's natural call site is wherever non-JSON
+/// agent stdout lines are logged as warnings during the transport read loop
+/// (`client/transport.rs`'s `filter_map`/log-and-drop path for lines that
+/// fail JSON-RPC parsing), which is out of `phase-08`'s declared file scope
+/// (`client/shutdown.rs`, `agent_command/{command_args,registry}.rs`,
+/// `session/persistence/repository/{close,prune}.rs`). Deferred rather than
+/// silently dropped — wiring this in is a small, well-scoped follow-up: at
+/// that call site, skip the warning log (but still discard the line) when
+/// `should_ignore_non_json_agent_output_line(agent_command, trimmed_line)`
+/// is `true`.
 pub fn should_ignore_non_json_agent_output_line(agent_command: &str, trimmed_line: &str) -> bool {
     let Ok(parts) = split_command_line(agent_command) else {
         return false;
@@ -131,6 +142,17 @@ pub fn should_ignore_non_json_agent_output_line(agent_command: &str, trimmed_lin
     basename_token(&parts.command) == "qodercli"
         && QODER_BENIGN_STDOUT_LINES.contains(&trimmed_line)
 }
+
+// `buildQoderAcpCommandArgs` (acpx's Qoder-specific `--max-turns`/
+// `--allowed-tools` CLI-arg injection, `others/acpx/src/acp/agent-command.ts`
+// L98-119) is deliberately NOT ported here. Per plan.md's Unresolved
+// Questions #7 and this phase's Locked-in Decisions, it's confirmed
+// deferred: it mutates the resolved argv for a single agent's CLI surface
+// (not a shutdown/detection primitive like the other three gap-22/26
+// functions), and no current caller in this crate resolves per-agent
+// `maxTurns`/`allowedTools` session options into CLI args at all yet — that
+// plumbing would need to land first, in a future phase, before this
+// function has anywhere real to be wired.
 
 #[cfg(test)]
 mod tests {
@@ -178,5 +200,49 @@ mod tests {
             basename_token("/usr/local/bin/Claude-Agent-ACP.CMD"),
             "claude-agent-acp"
         );
+    }
+
+    #[test]
+    fn qoder_command_gets_longer_stdin_close_delay() {
+        assert_eq!(
+            resolve_agent_close_after_stdin_end_ms("qodercli --acp").unwrap(),
+            QODER_AGENT_CLOSE_AFTER_STDIN_END_MS
+        );
+        assert_eq!(
+            resolve_agent_close_after_stdin_end_ms("/usr/local/bin/QoderCLI.exe --acp").unwrap(),
+            QODER_AGENT_CLOSE_AFTER_STDIN_END_MS
+        );
+    }
+
+    #[test]
+    fn non_qoder_command_gets_default_stdin_close_delay() {
+        assert_eq!(
+            resolve_agent_close_after_stdin_end_ms("cursor-agent acp").unwrap(),
+            DEFAULT_AGENT_CLOSE_AFTER_STDIN_END_MS
+        );
+    }
+
+    #[test]
+    fn qoder_benign_line_is_ignored() {
+        assert!(should_ignore_non_json_agent_output_line(
+            "qodercli --acp",
+            "Received interrupt signal. Cleaning up resources..."
+        ));
+    }
+
+    #[test]
+    fn non_qoder_command_never_ignores_lines() {
+        assert!(!should_ignore_non_json_agent_output_line(
+            "cursor-agent acp",
+            "Received interrupt signal. Cleaning up resources..."
+        ));
+    }
+
+    #[test]
+    fn qoder_command_only_ignores_known_benign_lines() {
+        assert!(!should_ignore_non_json_agent_output_line(
+            "qodercli --acp",
+            "some other stdout line"
+        ));
     }
 }

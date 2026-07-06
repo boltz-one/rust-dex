@@ -17,8 +17,30 @@ use crate::session::persistence::index::{
 pub struct PruneOptions {
     pub agent_command: Option<String>,
     pub before: Option<String>,
+    /// Convenience alternative to `before`: prune sessions whose
+    /// `closed_at_or_last_used_at` predates "now minus this many
+    /// milliseconds". Ports acpx's `PruneOptions.olderThanMs`. Ignored when
+    /// `before` is also set (mirrors acpx's `options.before ?? (olderThanMs
+    /// != null ? ... : undefined)` precedence — `before` wins).
+    pub older_than_ms: Option<u64>,
     pub include_history: bool,
     pub dry_run: bool,
+}
+
+/// Resolves the effective prune cutoff: `before` if set, otherwise a cutoff
+/// computed from `older_than_ms` (now minus that many milliseconds,
+/// formatted the same way `iso_now`/`closed_at_or_last_used_at` are, since
+/// cutoff comparisons are plain lexical string comparisons), otherwise
+/// `None` (no cutoff — every closed session is eligible). Ports the cutoff
+/// half of acpx's `pruneSessions`.
+fn resolve_prune_cutoff(query: &PruneOptions) -> Option<String> {
+    if let Some(before) = &query.before {
+        return Some(before.clone());
+    }
+    query.older_than_ms.map(|older_than_ms| {
+        let cutoff = chrono::Utc::now() - chrono::Duration::milliseconds(older_than_ms as i64);
+        cutoff.to_rfc3339()
+    })
 }
 
 pub struct PruneResult {
@@ -59,12 +81,12 @@ pub fn prune_sessions(
         })
         .collect();
 
+    let cutoff = resolve_prune_cutoff(query);
     let records: Vec<SessionRecord> = eligible
         .iter()
         .filter_map(|entry| load_record_from_file(options, &entry.file))
         .filter(|record| {
-            query
-                .before
+            cutoff
                 .as_deref()
                 .is_none_or(|cutoff| record.closed_at_or_last_used_at() < cutoff)
         })
@@ -138,6 +160,7 @@ mod tests {
             &PruneOptions {
                 agent_command: None,
                 before: None,
+                older_than_ms: None,
                 include_history: false,
                 dry_run: true,
             },
@@ -161,6 +184,7 @@ mod tests {
             &PruneOptions {
                 agent_command: None,
                 before: None,
+                older_than_ms: None,
                 include_history: false,
                 dry_run: false,
             },
@@ -183,6 +207,7 @@ mod tests {
             &PruneOptions {
                 agent_command: None,
                 before: None,
+                older_than_ms: None,
                 include_history: false,
                 dry_run: false,
             },
@@ -190,5 +215,92 @@ mod tests {
         .unwrap();
         assert!(result.pruned.is_empty());
         assert!(session_file_path(&options, &record.acpx_record_id).exists());
+    }
+
+    #[test]
+    fn older_than_ms_prunes_a_session_older_than_the_window() {
+        let dir = tempfile::tempdir().unwrap();
+        let options = options(&dir);
+        let mut record = sample_session_record();
+        record.closed = true; // last_used_at fixture is a fixed 2026-01-01 date, well in the past.
+        write_session_record(&options, &record).unwrap();
+
+        let result = prune_sessions(
+            &options,
+            &PruneOptions {
+                agent_command: None,
+                before: None,
+                older_than_ms: Some(1_000),
+                include_history: false,
+                dry_run: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.pruned.len(), 1);
+    }
+
+    #[test]
+    fn older_than_ms_produces_same_result_as_equivalent_before_cutoff() {
+        let dir = tempfile::tempdir().unwrap();
+        let options = options(&dir);
+        let mut record = sample_session_record();
+        record.closed = true;
+        write_session_record(&options, &record).unwrap();
+
+        let older_than_ms: u64 = 5_000;
+        let hand_computed_before = (chrono::Utc::now()
+            - chrono::Duration::milliseconds(older_than_ms as i64))
+        .to_rfc3339();
+
+        let via_older_than_ms = prune_sessions(
+            &options,
+            &PruneOptions {
+                agent_command: None,
+                before: None,
+                older_than_ms: Some(older_than_ms),
+                include_history: false,
+                dry_run: true,
+            },
+        )
+        .unwrap();
+        let via_before = prune_sessions(
+            &options,
+            &PruneOptions {
+                agent_command: None,
+                before: Some(hand_computed_before),
+                older_than_ms: None,
+                include_history: false,
+                dry_run: true,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(via_older_than_ms.pruned.len(), via_before.pruned.len());
+        assert_eq!(via_older_than_ms.pruned.len(), 1);
+    }
+
+    #[test]
+    fn before_takes_precedence_over_older_than_ms_when_both_set() {
+        let dir = tempfile::tempdir().unwrap();
+        let options = options(&dir);
+        let mut record = sample_session_record();
+        record.closed = true;
+        write_session_record(&options, &record).unwrap();
+
+        // `before` is set to a cutoff earlier than the fixture's
+        // `last_used_at`, so nothing should be pruned even though
+        // `older_than_ms` alone would match everything.
+        let result = prune_sessions(
+            &options,
+            &PruneOptions {
+                agent_command: None,
+                before: Some("2025-01-01T00:00:00Z".to_string()),
+                older_than_ms: Some(1_000),
+                include_history: false,
+                dry_run: true,
+            },
+        )
+        .unwrap();
+        assert!(result.pruned.is_empty());
     }
 }

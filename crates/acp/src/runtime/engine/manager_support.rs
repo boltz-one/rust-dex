@@ -8,6 +8,8 @@
 
 use std::collections::HashMap;
 
+use indexmap::IndexMap;
+
 use crate::error::AcpError;
 use crate::session::acpx_state::SessionAcpxState;
 use crate::session::conversation_model::conversation::{SessionConversation, SessionTokenUsage};
@@ -87,7 +89,7 @@ pub(super) fn create_initial_record(
         updated_at: now,
         cumulative_token_usage: Default::default(),
         cumulative_cost: None,
-        request_token_usage: HashMap::new(),
+        request_token_usage: IndexMap::new(),
         acpx: Some(SessionAcpxState::default()),
         imported_from: None,
         extra: Default::default(),

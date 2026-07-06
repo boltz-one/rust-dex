@@ -46,6 +46,7 @@ log.workspace = true
 regex.workspace = true
 dirs.workspace = true
 percent-encoding.workspace = true
+indexmap.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 smol.workspace = true

@@ -15,6 +15,7 @@
 
 use serde_json::Value;
 
+use crate::session::model_state::backfill_parsed_model_control;
 use crate::session::record::SessionRecord;
 use crate::session::schema::SessionSchemaVersion;
 
@@ -28,7 +29,15 @@ pub fn parse_session_record(raw: &Value) -> Option<SessionRecord> {
     if schema_tag != SessionSchemaVersion::V1.as_str() {
         return None;
     }
-    serde_json::from_value(raw.clone()).ok()
+    let mut record: SessionRecord = serde_json::from_value(raw.clone()).ok()?;
+    // Ports `assignParsedModelState`'s tail backfill (gap 30): mutate the
+    // parsed record in place so a missing `model_control` (with
+    // `available_models` present) survives a parse -> serialize -> parse
+    // round-trip, matching acpx's mutate-on-parse semantics.
+    if let Some(acpx) = record.acpx.as_mut() {
+        backfill_parsed_model_control(acpx);
+    }
+    Some(record)
 }
 
 #[cfg(test)]
@@ -86,5 +95,118 @@ mod tests {
     fn rejects_non_object_input() {
         assert!(parse_session_record(&serde_json::json!("not an object")).is_none());
         assert!(parse_session_record(&serde_json::json!(null)).is_none());
+    }
+
+    fn model_config_option() -> serde_json::Value {
+        use agent_client_protocol::schema::v1::{
+            SessionConfigId, SessionConfigKind, SessionConfigOption, SessionConfigSelect,
+            SessionConfigSelectOption,
+        };
+        let option = SessionConfigOption::new(
+            SessionConfigId::new("model"),
+            "Model",
+            SessionConfigKind::Select(SessionConfigSelect::new(
+                "gpt-5",
+                vec![SessionConfigSelectOption::new("gpt-5", "gpt-5")],
+            )),
+        );
+        serde_json::to_value(&option).unwrap()
+    }
+
+    #[test]
+    fn backfills_model_control_as_config_option_when_a_model_config_option_is_present() {
+        use crate::session::acpx_state::ModelControl;
+
+        let mut value = serialize_session_record_for_disk(&sample_session_record());
+        value["acpx"]["available_models"] = serde_json::json!(["gpt-5"]);
+        value["acpx"]["config_options"] = serde_json::json!([model_config_option()]);
+        value["acpx"]
+            .as_object_mut()
+            .unwrap()
+            .remove("model_control");
+
+        let parsed = parse_session_record(&value).expect("valid record should parse");
+        assert_eq!(
+            parsed.acpx.unwrap().model_control,
+            Some(ModelControl::ConfigOption),
+            "a model-designated config option should backfill config_option"
+        );
+    }
+
+    #[test]
+    fn backfills_model_control_as_legacy_set_model_when_no_model_config_option_present() {
+        use crate::session::acpx_state::ModelControl;
+
+        let mut value = serialize_session_record_for_disk(&sample_session_record());
+        value["acpx"]["available_models"] = serde_json::json!(["legacy-model"]);
+        value["acpx"]
+            .as_object_mut()
+            .unwrap()
+            .remove("config_options");
+        value["acpx"]
+            .as_object_mut()
+            .unwrap()
+            .remove("model_control");
+
+        let parsed = parse_session_record(&value).expect("valid record should parse");
+        assert_eq!(
+            parsed.acpx.unwrap().model_control,
+            Some(ModelControl::LegacySetModel),
+            "no model-designated config option should backfill legacy_set_model"
+        );
+    }
+
+    #[test]
+    fn backfilled_model_control_persists_through_a_round_trip() {
+        use crate::session::acpx_state::ModelControl;
+
+        let mut value = serialize_session_record_for_disk(&sample_session_record());
+        value["acpx"]["available_models"] = serde_json::json!(["legacy-model"]);
+        value["acpx"]
+            .as_object_mut()
+            .unwrap()
+            .remove("config_options");
+        value["acpx"]
+            .as_object_mut()
+            .unwrap()
+            .remove("model_control");
+
+        let parsed = parse_session_record(&value).expect("valid record should parse");
+        assert_eq!(
+            parsed.acpx.as_ref().unwrap().model_control,
+            Some(ModelControl::LegacySetModel)
+        );
+
+        // Re-serialize and re-parse: the backfilled value must have been
+        // written back onto the record itself (mutate-on-parse), not just
+        // reconstructed transiently — so it survives a second round-trip
+        // even without re-deriving it.
+        let reserialized = serialize_session_record_for_disk(&parsed);
+        assert_eq!(reserialized["acpx"]["model_control"], "legacy_set_model");
+        let reparsed = parse_session_record(&reserialized).expect("re-parse should succeed");
+        assert_eq!(
+            reparsed.acpx.unwrap().model_control,
+            Some(ModelControl::LegacySetModel)
+        );
+    }
+
+    #[test]
+    fn does_not_overwrite_an_explicit_model_control() {
+        use crate::session::acpx_state::ModelControl;
+
+        let mut value = serialize_session_record_for_disk(&sample_session_record());
+        value["acpx"]["available_models"] = serde_json::json!(["gpt-5"]);
+        value["acpx"]["model_control"] = serde_json::json!("config_option");
+        value["acpx"]
+            .as_object_mut()
+            .unwrap()
+            .remove("config_options");
+
+        let parsed = parse_session_record(&value).expect("valid record should parse");
+        assert_eq!(
+            parsed.acpx.unwrap().model_control,
+            Some(ModelControl::ConfigOption),
+            "an explicit model_control must not be overwritten by the backfill"
+        );
     }
 }

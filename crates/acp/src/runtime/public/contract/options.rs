@@ -3,12 +3,13 @@
 //! rest of `runtime::public`: turn-attachment encoding and the legacy
 //! terminal-event compatibility shim.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use agent_client_protocol::schema::v1::McpServer;
 
-use crate::permissions::PermissionRequestHandler;
+use crate::permissions::{PermissionEscalationEvent, PermissionPolicy, PermissionRequestHandler};
 use crate::runtime::public::errors::{AcpRuntimeError, AcpRuntimeErrorCode};
 use crate::runtime::public::events::AcpRuntimeEvent;
 use crate::types::{NonInteractivePermissionPolicy, PermissionMode};
@@ -38,6 +39,21 @@ pub struct AcpRuntimeOptions {
     pub verbose: bool,
     pub terminal: bool,
     pub on_permission_request: Option<Arc<dyn PermissionRequestHandler>>,
+    /// Gap 1 (ADR-7): programmatic permission policy the embedding host
+    /// constructs and passes in (autoApprove/autoDeny/escalate rules).
+    /// `None` = no policy overrides. No CLI/config-file loader — this crate
+    /// is a library, the host owns config.
+    pub permission_policy: Option<PermissionPolicy>,
+    /// Gap 2 (ADR-8): fire-and-forget escalation audit callback, invoked
+    /// once per policy `escalate` match that no interactive handler
+    /// resolved. Synchronous, non-blocking, best-effort (a panic inside it
+    /// is caught and must not poison the permission RPC path).
+    pub on_permission_escalation: Option<Arc<dyn Fn(PermissionEscalationEvent) + Send + Sync>>,
+    /// Gap 24: app-supplied auth-credential map (auth-method id -> secret),
+    /// merged into the spawned agent's environment (see
+    /// [`crate::auth_env::build_agent_environment`]). `None` = ambient
+    /// process env only. Carries secrets — never logged.
+    pub auth_credentials: Option<HashMap<String, String>>,
     /// Phase 6 addition (ADR-4): bound on each session's pending-prompt
     /// FIFO (`crate::queue::SessionPromptQueue`). `None` uses
     /// `crate::queue::DEFAULT_QUEUE_CAPACITY`. Not part of acpx's

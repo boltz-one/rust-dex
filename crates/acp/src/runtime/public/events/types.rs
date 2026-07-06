@@ -97,4 +97,27 @@ pub enum AcpRuntimeEvent {
         detail_code: Option<String>,
         retryable: Option<bool>,
     },
+    /// Ports acpx's `ClientOperation` type (`types.ts` L130-147), surfaced
+    /// at the same tier as a `session/update`-derived event (see
+    /// `manager.ts:1101-1109`'s dual `onClientOperation` handling: persisted
+    /// via `record_client_operation` AND streamed as this variant). `method`
+    /// mirrors acpx's closed `ClientOperationMethod` union (e.g.
+    /// `"fs/read_text_file"`, `"terminal/create"`) and `status` its
+    /// `ClientOperationStatus` union (`"running"`/`"completed"`/`"failed"`)
+    /// as plain strings, matching this file's existing open-tag convention
+    /// ([`AcpSessionUpdateTag`]) rather than adding narrow enums no other
+    /// variant here uses.
+    ///
+    /// `TODO(gap-20-wiring)`: [`crate::filesystem::FilesystemHandlers`]'s and
+    /// [`crate::terminal::TerminalManager`]'s `on_operation` callbacks are
+    /// not yet wired to construct/emit this variant — that's the runtime
+    /// engine's (`manager_spawn.rs`/`prompt_turn`) responsibility, out of
+    /// this phase's file-ownership scope.
+    ClientOperation {
+        method: String,
+        status: String,
+        summary: String,
+        details: Option<String>,
+        timestamp: String,
+    },
 }

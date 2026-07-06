@@ -4,11 +4,52 @@
 
 use std::sync::Arc;
 
+use agent_client_protocol::schema::v1::SessionId;
+
 use super::AcpRuntime;
+use crate::error::AcpError;
+use crate::runtime::engine::connected_session::ConnectedSession;
 use crate::runtime::engine::manager_support::wrap_err;
 use crate::runtime::public::contract::AcpRuntimeHandle;
 use crate::runtime::public::errors::{AcpRuntimeError, AcpRuntimeErrorCode};
 use crate::session::conversation_model::iso_now;
+
+/// Gap 9: ports the `discardPersistentState` half of acpx's
+/// `closeBackendSession` — sends `session/close` only when the caller wants
+/// the backend session actually discarded AND the agent advertised
+/// `sessionCapabilities.close` (mirroring acpx's `supportsCloseSession()`
+/// gate one layer up, before ever attempting the RPC). Unlike acpx's
+/// version (which may spin up a throwaway client just to close a session
+/// with no live connection), this crate's `close()` only ever runs against
+/// an already-connected [`ConnectedSession`], so there is no
+/// "pending/persistent client" case to special-case.
+///
+/// Best-effort per the phase's Security Considerations: a resource-not-found
+/// response is swallowed (the session is already gone server-side, which is
+/// the desired end state); any other RPC failure is logged but never
+/// propagated — the caller's local cleanup must run regardless of whether
+/// the agent-side close actually succeeded.
+async fn close_backend_session_if_discarding(connected: &ConnectedSession, session_id: SessionId) {
+    let capability_advertised = connected
+        .record
+        .lock()
+        .agent_capabilities
+        .as_ref()
+        .is_some_and(|caps| caps.session_capabilities.close.is_some());
+    if !capability_advertised {
+        return;
+    }
+
+    match connected.client.session_close(session_id).await {
+        Ok(_) => {}
+        Err(AcpError::SessionNotFound { .. }) => {
+            // Already gone server-side — exactly the state we wanted.
+        }
+        Err(err) => {
+            log::warn!("[acp] session/close request failed (continuing with local cleanup): {err}");
+        }
+    }
+}
 
 impl AcpRuntime {
     /// Ports `cancel`.
@@ -84,12 +125,15 @@ impl AcpRuntime {
         };
 
         if discard_persistent_state {
-            // Best-effort: the record simply stops being reachable via
+            // Gap 9: best-effort agent-side close before the record becomes
+            // unreachable. The record simply stops being reachable via
             // `ensure_session` again once removed from the live map; actual
             // deletion of the on-disk file is a repository-level operation
             // (`session::persistence::repository`) this trait-based
             // `AcpSessionStore` doesn't expose a `delete` for (acpx's own
             // `AcpSessionStore` interface doesn't either — only `load`/`save`).
+            let session_id = SessionId::new(connected.record.lock().acp_session_id.clone());
+            close_backend_session_if_discarding(&connected, session_id).await;
         } else {
             let mut record = connected.record.lock().clone();
             record.closed = true;

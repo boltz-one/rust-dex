@@ -17,8 +17,71 @@ use crate::runtime::public::probe::probe_runtime;
 use crate::session::mode_preference::{set_desired_config_option, set_desired_mode_id};
 
 impl AcpRuntime {
-    /// Ports `getCapabilities`.
-    pub fn get_capabilities(&self) -> AcpRuntimeCapabilities {
+    /// Ports `getCapabilities` (gap 13). With no handle, returns the
+    /// static base capability set unchanged — backward-compatible for
+    /// no-handle callers. With a handle, reads `config_option_keys` from
+    /// that session's actually-advertised config options: from the live
+    /// in-memory record when the session is currently connected (this
+    /// phase's ADR — zero extra I/O for the common case), falling back to
+    /// `session_store.load()` for a handle that resolves to a
+    /// not-currently-connected session. A handle that resolves to nothing
+    /// (or advertises no config options) also falls back to the static
+    /// list.
+    pub async fn get_capabilities(
+        &self,
+        handle: Option<&AcpRuntimeHandle>,
+    ) -> AcpRuntimeCapabilities {
+        let base = Self::base_capabilities();
+        let Some(handle) = handle else {
+            return base;
+        };
+
+        let config_options = match self.connected(handle) {
+            Ok(connected) => connected
+                .record
+                .lock()
+                .acpx
+                .as_ref()
+                .and_then(|acpx| acpx.config_options.clone()),
+            Err(_) => {
+                let record_id = self
+                    .resolve_handle_from_runtime_session_name(handle)
+                    .acpx_record_id
+                    .unwrap_or_else(|| handle.session_key.clone());
+                self.options
+                    .session_store
+                    .load(record_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .and_then(|record| record.acpx)
+                    .and_then(|acpx| acpx.config_options)
+            }
+        };
+
+        let Some(config_options) = config_options else {
+            return base;
+        };
+
+        let mut keys: Vec<String> = Vec::new();
+        for option in config_options {
+            let id = option.id.0.trim();
+            if !id.is_empty() && !keys.iter().any(|existing| existing == id) {
+                keys.push(id.to_string());
+            }
+        }
+
+        if keys.is_empty() {
+            return base;
+        }
+
+        AcpRuntimeCapabilities {
+            config_option_keys: Some(keys),
+            ..base
+        }
+    }
+
+    fn base_capabilities() -> AcpRuntimeCapabilities {
         AcpRuntimeCapabilities {
             controls: vec![
                 AcpRuntimeControl::SetMode,

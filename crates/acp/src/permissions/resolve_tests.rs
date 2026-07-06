@@ -195,6 +195,80 @@ fn escalate_with_handler_uses_decision() {
 }
 
 #[test]
+fn policy_auto_approve_matches_and_allows_independent_of_mode() {
+    smol::block_on(async {
+        let policy = PermissionPolicy {
+            auto_approve: vec!["read".to_string()],
+            ..Default::default()
+        };
+        // Mode is `DenyAll` — without the policy match, this request would
+        // be rejected. The `Approve` policy action must win regardless.
+        let resolved = resolve_permission_request_with_details(
+            &request("Read: file.txt"),
+            PermissionMode::DenyAll,
+            NonInteractivePermissionPolicy::Deny,
+            Some(&policy),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(class_of(&resolved.response), "allow");
+        assert!(
+            resolved.escalation.is_none(),
+            "a plain Approve match should not emit an escalation event"
+        );
+    });
+}
+
+#[test]
+fn policy_approve_overrides_deny_all_mode() {
+    smol::block_on(async {
+        let policy = PermissionPolicy {
+            auto_approve: vec!["execute".to_string()],
+            ..Default::default()
+        };
+        let resolved = resolve_permission_request_with_details(
+            &request("Execute: rm -rf /"),
+            PermissionMode::DenyAll,
+            NonInteractivePermissionPolicy::Deny,
+            Some(&policy),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            class_of(&resolved.response),
+            "allow",
+            "a policy Approve rule must override an otherwise-DenyAll-rejected request"
+        );
+    });
+}
+
+#[test]
+fn policy_deny_overrides_approve_reads_mode() {
+    smol::block_on(async {
+        let policy = PermissionPolicy {
+            auto_deny: vec!["read".to_string()],
+            ..Default::default()
+        };
+        let resolved = resolve_permission_request_with_details(
+            &request("Read: file.txt"),
+            PermissionMode::ApproveReads,
+            NonInteractivePermissionPolicy::Fail,
+            Some(&policy),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            class_of(&resolved.response),
+            "reject",
+            "a policy Deny rule must override an otherwise-auto-approved read"
+        );
+    });
+}
+
+#[test]
 fn empty_options_always_cancels() {
     smol::block_on(async {
         let request = RequestPermissionRequest::new(

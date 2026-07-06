@@ -169,3 +169,45 @@ fn write_denied_in_deny_all_mode() {
         assert!(matches!(result, Err(AcpError::PermissionDenied(_))));
     });
 }
+
+/// Gap 20: driving a real `fs/read_text_file` through a handler with an
+/// `on_operation` callback attached observes the callback firing with the
+/// expected method/status pairs (running -> completed), pure handler-level
+/// (no runtime engine involved).
+#[test]
+fn on_operation_callback_fires_for_real_read_text_file() {
+    smol::block_on(async {
+        let root = tempdir();
+        std::fs::write(root.join("hello.txt"), "hi").unwrap();
+        let observed: std::sync::Arc<parking_lot::Mutex<Vec<(String, String)>>> =
+            std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let observed_clone = observed.clone();
+        let handlers = FilesystemHandlers::new(
+            &root,
+            PermissionMode::ApproveAll,
+            NonInteractivePermissionPolicy::Deny,
+            None,
+        )
+        .unwrap()
+        .with_on_operation(std::sync::Arc::new(move |operation: ClientOperation| {
+            observed_clone
+                .lock()
+                .push((operation.method, operation.status));
+        }));
+
+        handlers
+            .read_text_file(ReadTextFileRequest::new("s1", root.join("hello.txt")))
+            .await
+            .unwrap();
+
+        let calls = observed.lock().clone();
+        assert!(
+            calls.contains(&("fs/read_text_file".to_string(), "running".to_string())),
+            "expected a running fs/read_text_file operation, got {calls:?}"
+        );
+        assert!(
+            calls.contains(&("fs/read_text_file".to_string(), "completed".to_string())),
+            "expected a completed fs/read_text_file operation, got {calls:?}"
+        );
+    });
+}
