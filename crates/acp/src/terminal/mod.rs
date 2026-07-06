@@ -29,7 +29,9 @@ use parking_lot::Mutex;
 pub use output::{DEFAULT_TERMINAL_OUTPUT_LIMIT_BYTES, OutputSnapshot};
 
 use crate::error::{AcpError, Result};
+use crate::filesystem::{ClientOperation, OnOperationCallback};
 use crate::permissions::{PermissionRequestHandler, confirm_action};
+use crate::session::conversation_model::conversation::iso_now;
 use crate::types::{NonInteractivePermissionPolicy, PermissionMode};
 use output::OutputBuffer;
 use spawn::spawn_terminal_process;
@@ -60,6 +62,12 @@ pub struct TerminalManager {
     handler: Option<Arc<dyn PermissionRequestHandler>>,
     kill_grace: Duration,
     terminals: Mutex<HashMap<TerminalId, Arc<ManagedTerminal>>>,
+    // TODO(gap-20-wiring): defaults to `None` so `TerminalManager::new`'s
+    // existing call sites (`manager_spawn.rs`, `terminal::mod_tests`)
+    // compile unchanged; the runtime engine is expected to attach this via
+    // `with_on_operation` and wire it to `record_client_operation` +
+    // `AcpRuntimeEvent::ClientOperation`'s event-stream emission.
+    on_operation: Option<OnOperationCallback>,
 }
 
 impl TerminalManager {
@@ -71,7 +79,20 @@ impl TerminalManager {
             handler: options.handler,
             kill_grace: options.kill_grace.unwrap_or(kill::DEFAULT_KILL_GRACE),
             terminals: Mutex::new(HashMap::new()),
+            on_operation: None,
         }
+    }
+
+    /// Attaches an operation-progress callback, mirroring acpx's
+    /// `TerminalManagerOptions.onOperation`. Consumes/returns `Self` so
+    /// existing `TerminalManager::new(...)` call sites that don't chain
+    /// this builder keep compiling unchanged (gap 20). Deliberately not a
+    /// field on [`TerminalManagerOptions`] itself — that struct is
+    /// constructed via plain struct literals in out-of-scope files
+    /// (`manager_spawn.rs`) that this phase must not edit.
+    pub fn with_on_operation(mut self, on_operation: OnOperationCallback) -> Self {
+        self.on_operation = Some(on_operation);
+        self
     }
 
     /// Ports `updatePermissionPolicy`.
@@ -84,12 +105,27 @@ impl TerminalManager {
         self.non_interactive_policy = non_interactive_policy;
     }
 
+    fn emit_operation(&self, method: &str, status: &str, summary: String, details: Option<String>) {
+        if let Some(on_operation) = &self.on_operation {
+            on_operation(ClientOperation {
+                method: method.to_string(),
+                status: status.to_string(),
+                summary,
+                details,
+                timestamp: iso_now(),
+            });
+        }
+    }
+
     /// Ports `createTerminal`.
     pub async fn create_terminal(
         &self,
         params: CreateTerminalRequest,
     ) -> Result<CreateTerminalResponse> {
         let command_line = command_line_description(&params.command, &params.args);
+        let summary = format!("terminal/create: {command_line}");
+        self.emit_operation("terminal/create", "running", summary.clone(), None);
+
         let approved = confirm_action(
             self.permission_mode,
             self.non_interactive_policy,
@@ -99,7 +135,9 @@ impl TerminalManager {
         )
         .await?;
         if !approved {
-            return Err(AcpError::PermissionDenied("terminal/create".to_string()));
+            let message = "terminal/create".to_string();
+            self.emit_operation("terminal/create", "failed", summary, Some(message.clone()));
+            return Err(AcpError::PermissionDenied(message));
         }
 
         let output_byte_limit = params
@@ -128,6 +166,12 @@ impl TerminalManager {
 
         let terminal_id = TerminalId::new(uuid::Uuid::new_v4().to_string());
         self.terminals.lock().insert(terminal_id.clone(), terminal);
+        self.emit_operation(
+            "terminal/create",
+            "completed",
+            summary,
+            Some(format!("terminalId={terminal_id}")),
+        );
         Ok(CreateTerminalResponse::new(terminal_id))
     }
 
@@ -139,6 +183,12 @@ impl TerminalManager {
         let terminal = self.get_terminal(&params.terminal_id)?;
         let snapshot = terminal.output.snapshot();
         let exit_status = tracking::current_exit_status(&terminal.child).await;
+        self.emit_operation(
+            "terminal/output",
+            "completed",
+            format!("terminal/output: {}", params.terminal_id),
+            None,
+        );
         Ok(
             TerminalOutputResponse::new(snapshot.output, snapshot.truncated)
                 .exit_status(exit_status),
@@ -152,13 +202,25 @@ impl TerminalManager {
     ) -> Result<WaitForTerminalExitResponse> {
         let terminal = self.get_terminal(&params.terminal_id)?;
         let status = tracking::poll_exit_status(&terminal.child).await;
+        self.emit_operation(
+            "terminal/wait_for_exit",
+            "completed",
+            format!("terminal/wait_for_exit: {}", params.terminal_id),
+            Some(format!(
+                "exitCode={:?}, signal={:?}",
+                status.exit_code, status.signal
+            )),
+        );
         Ok(WaitForTerminalExitResponse::new(status))
     }
 
     /// Ports `killTerminal`.
     pub async fn kill_terminal(&self, params: KillTerminalRequest) -> Result<KillTerminalResponse> {
         let terminal = self.get_terminal(&params.terminal_id)?;
+        let summary = format!("terminal/kill: {}", params.terminal_id);
+        self.emit_operation("terminal/kill", "running", summary.clone(), None);
         kill::kill_process(&terminal, self.kill_grace).await;
+        self.emit_operation("terminal/kill", "completed", summary, None);
         Ok(KillTerminalResponse::new())
     }
 
@@ -167,12 +229,22 @@ impl TerminalManager {
         &self,
         params: ReleaseTerminalRequest,
     ) -> Result<ReleaseTerminalResponse> {
+        let summary = format!("terminal/release: {}", params.terminal_id);
+        self.emit_operation("terminal/release", "running", summary.clone(), None);
+
         let terminal = self.terminals.lock().remove(&params.terminal_id);
         let Some(terminal) = terminal else {
+            self.emit_operation(
+                "terminal/release",
+                "completed",
+                summary,
+                Some("already released".to_string()),
+            );
             return Ok(ReleaseTerminalResponse::new());
         };
         kill::kill_process(&terminal, self.kill_grace).await;
         terminal.output.clear();
+        self.emit_operation("terminal/release", "completed", summary, None);
         Ok(ReleaseTerminalResponse::new())
     }
 

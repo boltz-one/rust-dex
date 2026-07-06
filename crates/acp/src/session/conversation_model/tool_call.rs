@@ -36,7 +36,13 @@ fn status_indicates_complete(status: &str) -> bool {
         .any(|needle| normalized.contains(needle))
 }
 
-fn status_indicates_error(status: &str) -> bool {
+/// Ports `statusIndicatesError`: always a concrete `bool`, `false` when
+/// `status` is absent (ADR-9, gap 19) — the caller no longer distinguishes
+/// "no opinion, preserve prior value" from "explicitly not an error".
+fn status_indicates_error(status: Option<&str>) -> bool {
+    let Some(status) = status else {
+        return false;
+    };
     let normalized = status.to_lowercase();
     normalized.contains("fail") || normalized.contains("error")
 }
@@ -71,7 +77,7 @@ pub fn apply_tool_call_update(agent: &mut SessionAgentMessage, update: &ToolCall
         || update.kind.is_some();
     if has_result_patch {
         let tool_name = tool.name.clone();
-        let is_error = update.status.as_deref().map(status_indicates_error);
+        let is_error = status_indicates_error(update.status.as_deref());
         let content = update
             .raw_output
             .as_ref()
@@ -142,5 +148,36 @@ mod tests {
             },
         );
         assert!(agent.tool_results.get("t1").unwrap().is_error);
+    }
+
+    /// ADR-9 (gap 19): a prior error-flagged update must not stay "sticky"
+    /// across a later result-triggering update that carries no `status` —
+    /// `is_error` resets to `false`, matching acpx's always-concrete-bool
+    /// `statusIndicatesError` exactly.
+    #[test]
+    fn apply_tool_call_update_resets_is_error_when_status_absent() {
+        let mut agent = SessionAgentMessage::default();
+        apply_tool_call_update(
+            &mut agent,
+            &ToolCallUpdateInput {
+                tool_call_id: "t1".into(),
+                status: Some("failed".into()),
+                raw_output_present: true,
+                raw_output: Some(serde_json::json!("boom")),
+                ..Default::default()
+            },
+        );
+        assert!(agent.tool_results.get("t1").unwrap().is_error);
+
+        // Title-only update: no `status` field present at all.
+        apply_tool_call_update(
+            &mut agent,
+            &ToolCallUpdateInput {
+                tool_call_id: "t1".into(),
+                title: Some("Renamed Tool".into()),
+                ..Default::default()
+            },
+        );
+        assert!(!agent.tool_results.get("t1").unwrap().is_error);
     }
 }

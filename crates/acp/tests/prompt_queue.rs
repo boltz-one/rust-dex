@@ -40,6 +40,9 @@ fn test_runtime(
         verbose: false,
         terminal: false,
         on_permission_request: None,
+        permission_policy: None,
+        on_permission_escalation: None,
+        auth_credentials: None,
         prompt_queue_capacity,
     };
     std::sync::Arc::new(AcpRuntime::new(options))

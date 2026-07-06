@@ -10,11 +10,18 @@
 //! normalizes via `path.resolve`, so Node's `fs.readFile`/`writeFile` would
 //! silently follow such a symlink out of the sandbox).
 //!
-//! acpx's CLI-only `ClientOperation`/`onOperation` event stream (used for
-//! `--json` progress output) is not ported — it's CLI/commander surface out
-//! of this crate's scope (see plan.md).
+//! acpx's `ClientOperation`/`onOperation` progress-event mechanism (see
+//! `others/acpx/src/filesystem.ts`'s `emitOperation` call sites) is a real
+//! **runtime-engine** mechanism — not CLI-only — mirrored here on
+//! [`FilesystemHandlers`]'s `on_operation` callback field. This crate's
+//! runtime engine (`manager_spawn.rs`/`prompt_turn`) is responsible for
+//! wiring that callback into `record_client_operation` and
+//! [`crate::runtime::public::events::AcpRuntimeEvent::ClientOperation`]'s
+//! event-stream emission (see that field's `TODO(gap-20-wiring)` doc
+//! comment).
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use agent_client_protocol::schema::v1::{
     ReadTextFileRequest, ReadTextFileResponse, WriteTextFileRequest, WriteTextFileResponse,
@@ -22,7 +29,25 @@ use agent_client_protocol::schema::v1::{
 
 use crate::error::{AcpError, Result};
 use crate::permissions::{PermissionRequestHandler, confirm_action};
+use crate::session::conversation_model::conversation::iso_now;
 use crate::types::{NonInteractivePermissionPolicy, PermissionMode};
+
+/// Ports acpx's `ClientOperation` type (`others/acpx/src/types.ts` L130-147)
+/// — a progress notification emitted around a single fs/terminal RPC.
+/// `method`/`status` mirror acpx's closed `ClientOperationMethod`/
+/// `ClientOperationStatus` string unions as plain `String`s (e.g.
+/// `"fs/read_text_file"`, `"running"`/`"completed"`/`"failed"`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClientOperation {
+    pub method: String,
+    pub status: String,
+    pub summary: String,
+    pub details: Option<String>,
+    pub timestamp: String,
+}
+
+/// Ports acpx's `onOperation?: (operation: ClientOperation) => void`.
+pub type OnOperationCallback = Arc<dyn Fn(ClientOperation) + Send + Sync>;
 
 /// Owns the sandboxed root and the current permission policy for
 /// `fs/read_text_file` / `fs/write_text_file`. Ports the state
@@ -32,6 +57,12 @@ pub struct FilesystemHandlers {
     permission_mode: PermissionMode,
     non_interactive_policy: NonInteractivePermissionPolicy,
     handler: Option<std::sync::Arc<dyn PermissionRequestHandler>>,
+    // TODO(gap-20-wiring): defaults to `None` so `FilesystemHandlers::new`'s
+    // existing call sites (`manager_spawn.rs`) compile unchanged; the
+    // runtime engine is expected to attach this via `with_on_operation` and
+    // wire it to `record_client_operation` +
+    // `AcpRuntimeEvent::ClientOperation`'s event-stream emission.
+    on_operation: Option<OnOperationCallback>,
 }
 
 impl FilesystemHandlers {
@@ -55,7 +86,17 @@ impl FilesystemHandlers {
             permission_mode,
             non_interactive_policy,
             handler,
+            on_operation: None,
         })
+    }
+
+    /// Attaches an operation-progress callback, mirroring acpx's
+    /// `FileSystemHandlersOptions.onOperation`. Consumes/returns `Self` so
+    /// existing `FilesystemHandlers::new(...)` call sites that don't chain
+    /// this builder keep compiling unchanged (gap 20).
+    pub fn with_on_operation(mut self, on_operation: OnOperationCallback) -> Self {
+        self.on_operation = Some(on_operation);
+        self
     }
 
     /// Ports `updatePermissionPolicy`.
@@ -68,20 +109,58 @@ impl FilesystemHandlers {
         self.non_interactive_policy = non_interactive_policy;
     }
 
+    fn emit_operation(&self, method: &str, status: &str, summary: String, details: Option<String>) {
+        if let Some(on_operation) = &self.on_operation {
+            on_operation(ClientOperation {
+                method: method.to_string(),
+                status: status.to_string(),
+                summary,
+                details,
+                timestamp: iso_now(),
+            });
+        }
+    }
+
     /// Ports `readTextFile`.
     pub async fn read_text_file(
         &self,
         params: ReadTextFileRequest,
     ) -> Result<ReadTextFileResponse> {
         let path = self.resolve_path_within_root(&params.path)?;
+        let summary = format!("read_text_file: {}", path.display());
+        let details = read_window_details(params.line, params.limit);
+        self.emit_operation(
+            "fs/read_text_file",
+            "running",
+            summary.clone(),
+            details.clone(),
+        );
+
         if self.permission_mode == PermissionMode::DenyAll {
-            return Err(AcpError::PermissionDenied(
-                "fs/read_text_file (--deny-all)".to_string(),
-            ));
+            let message = "fs/read_text_file (--deny-all)".to_string();
+            self.emit_operation(
+                "fs/read_text_file",
+                "failed",
+                summary,
+                Some(message.clone()),
+            );
+            return Err(AcpError::PermissionDenied(message));
         }
 
-        let content = std::fs::read_to_string(&path)
-            .map_err(|source| io_err(format!("failed to read {}", path.display()), source))?;
+        let content = match std::fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(source) => {
+                let err = io_err(format!("failed to read {}", path.display()), source);
+                self.emit_operation(
+                    "fs/read_text_file",
+                    "failed",
+                    summary,
+                    Some(err.to_string()),
+                );
+                return Err(err);
+            }
+        };
+        self.emit_operation("fs/read_text_file", "completed", summary, details);
         Ok(ReadTextFileResponse::new(slice_content(
             &content,
             params.line,
@@ -95,6 +174,9 @@ impl FilesystemHandlers {
         params: WriteTextFileRequest,
     ) -> Result<WriteTextFileResponse> {
         let path = self.resolve_path_within_root(&params.path)?;
+        let summary = format!("write_text_file: {}", path.display());
+        self.emit_operation("fs/write_text_file", "running", summary.clone(), None);
+
         let title = format!("Allow write to {}", path.display());
         let approved = confirm_action(
             self.permission_mode,
@@ -105,16 +187,39 @@ impl FilesystemHandlers {
         )
         .await?;
         if !approved {
-            return Err(AcpError::PermissionDenied("fs/write_text_file".to_string()));
+            let message = "fs/write_text_file".to_string();
+            self.emit_operation(
+                "fs/write_text_file",
+                "failed",
+                summary,
+                Some(message.clone()),
+            );
+            return Err(AcpError::PermissionDenied(message));
         }
 
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|source| {
-                io_err(format!("failed to create {}", parent.display()), source)
-            })?;
+            if let Err(source) = std::fs::create_dir_all(parent) {
+                let err = io_err(format!("failed to create {}", parent.display()), source);
+                self.emit_operation(
+                    "fs/write_text_file",
+                    "failed",
+                    summary,
+                    Some(err.to_string()),
+                );
+                return Err(err);
+            }
         }
-        std::fs::write(&path, &params.content)
-            .map_err(|source| io_err(format!("failed to write {}", path.display()), source))?;
+        if let Err(source) = std::fs::write(&path, &params.content) {
+            let err = io_err(format!("failed to write {}", path.display()), source);
+            self.emit_operation(
+                "fs/write_text_file",
+                "failed",
+                summary,
+                Some(err.to_string()),
+            );
+            return Err(err);
+        }
+        self.emit_operation("fs/write_text_file", "completed", summary, None);
         Ok(WriteTextFileResponse::new())
     }
 
@@ -194,6 +299,18 @@ fn slice_content(content: &str, line: Option<u32>, limit: Option<u32>) -> String
         None => lines.len(),
     };
     lines[start_index..end_index].join("\n")
+}
+
+/// Ports `readWindowDetails`: a human-readable `line=.., limit=..` summary
+/// for a read's `ClientOperation.details`, or `None` when neither
+/// windowing param was given (matching acpx's `undefined` return).
+fn read_window_details(line: Option<u32>, limit: Option<u32>) -> Option<String> {
+    if line.is_none() && limit.is_none() {
+        return None;
+    }
+    let start = line.map(|l| l.max(1)).unwrap_or(1);
+    let max = limit.map_or_else(|| "all".to_string(), |l| l.to_string());
+    Some(format!("line={start}, limit={max}"))
 }
 
 // Split out per the workspace's <200-line file guideline; logically still

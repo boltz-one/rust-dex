@@ -3,8 +3,7 @@
 //! Ports `SessionConversation`, `SessionTokenUsage`, `SessionUsageCost` from
 //! `others/acpx/src/types.ts`.
 
-use std::collections::HashMap;
-
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
@@ -55,7 +54,7 @@ pub struct SessionConversation {
     #[serde(default)]
     pub cumulative_cost: Option<SessionUsageCost>,
     #[serde(default)]
-    pub request_token_usage: HashMap<String, SessionTokenUsage>,
+    pub request_token_usage: IndexMap<String, SessionTokenUsage>,
 }
 
 /// Current wall-clock time as an ISO-8601 string. Ports the several local
@@ -72,7 +71,7 @@ pub fn create_session_conversation(timestamp: impl Into<Option<String>>) -> Sess
         updated_at: timestamp.into().unwrap_or_else(iso_now),
         cumulative_token_usage: SessionTokenUsage::default(),
         cumulative_cost: None,
-        request_token_usage: HashMap::new(),
+        request_token_usage: IndexMap::new(),
     }
 }
 

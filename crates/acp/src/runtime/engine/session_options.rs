@@ -5,8 +5,97 @@
 
 use std::collections::HashMap;
 
+use agent_client_protocol::schema::v1::Meta;
+use serde_json::Value;
+
 use crate::session::acpx_state::{SessionOptions, SystemPromptOption};
 use crate::session::record::SessionRecord;
+
+/// Ports `CLAUDE_CODE_DEFAULT_SETTING_SOURCES`.
+const CLAUDE_CODE_DEFAULT_SETTING_SOURCES: [&str; 2] = ["project", "local"];
+
+/// Ports `resolveClaudeCodeSettingSources`. Kept as `ACPX_CLAUDE_*` (not
+/// renamed to this crate's usual `ACP_` prefix) to match the existing
+/// convention `agent_command::claude_quirks`/`gemini_quirks` already
+/// established for acpx-ported env-var names in this crate.
+pub fn resolve_claude_code_setting_sources() -> Vec<String> {
+    let include_user_settings = std::env::var("ACPX_CLAUDE_INCLUDE_USER_SETTINGS")
+        .map(|value| value.trim() == "1")
+        .unwrap_or(false);
+    let mut sources = Vec::with_capacity(3);
+    if include_user_settings {
+        sources.push("user".to_string());
+    }
+    sources.extend(
+        CLAUDE_CODE_DEFAULT_SETTING_SOURCES
+            .iter()
+            .map(|s| s.to_string()),
+    );
+    sources
+}
+
+/// Ports `buildClaudeCodeOptionsMeta`: builds the `_meta.claudeCode.options`
+/// (plus a top-level `_meta.systemPrompt`, matching acpx's
+/// `assignClaudeCodeSystemPrompt` writing onto `meta` rather than the nested
+/// `claudeCode.options` object) block a fresh `session/new` request attaches
+/// so a Claude Code ACP adapter picks up the session's persisted
+/// model/allowedTools/maxTurns/systemPrompt. Applied unconditionally
+/// (Requirement 2) — non-Claude agents ignore unrecognized `_meta` keys per
+/// ACP's extensibility convention, so there's no need to gate this on
+/// `is_claude_acp`. `isolate_user_settings` (acpx's `isolateUserSettings`
+/// parameter) IS still gated by the caller on `is_claude_acp`, matching
+/// acpx's own call site (`client.ts`'s `createSession`).
+pub fn build_claude_code_options_meta(
+    options: Option<&SessionAgentOptions>,
+    isolate_user_settings: bool,
+) -> Option<Meta> {
+    let mut claude_code_options = serde_json::Map::new();
+    if isolate_user_settings {
+        claude_code_options.insert(
+            "settingSources".to_string(),
+            Value::from(resolve_claude_code_setting_sources()),
+        );
+    }
+    if let Some(options) = options {
+        if let Some(model) = options.model.as_deref() {
+            if !model.trim().is_empty() {
+                claude_code_options.insert("model".to_string(), Value::from(model));
+            }
+        }
+        if let Some(allowed_tools) = &options.allowed_tools {
+            claude_code_options.insert(
+                "allowedTools".to_string(),
+                Value::from(allowed_tools.clone()),
+            );
+        }
+        if let Some(max_turns) = options.max_turns {
+            claude_code_options.insert("maxTurns".to_string(), Value::from(max_turns));
+        }
+    }
+
+    let mut meta = serde_json::Map::new();
+    if !claude_code_options.is_empty() {
+        meta.insert(
+            "claudeCode".to_string(),
+            serde_json::json!({ "options": claude_code_options }),
+        );
+    }
+
+    if let Some(system_prompt) = options.and_then(|o| o.system_prompt.as_ref()) {
+        let has_content = match system_prompt {
+            SystemPromptOption::Direct(text) => !text.is_empty(),
+            SystemPromptOption::Append { append } => !append.is_empty(),
+        };
+        if has_content {
+            meta.insert(
+                "systemPrompt".to_string(),
+                serde_json::to_value(system_prompt).expect("SystemPromptOption always serializes"),
+            );
+        }
+    }
+
+    (!meta.is_empty()).then_some(meta)
+}
 
 /// Ports `SessionAgentOptions`. Threaded into a fresh `session/new` request
 /// (system prompt / env) and persisted onto the new record so a later
@@ -159,5 +248,70 @@ mod tests {
         persist_session_options(&mut record, Some(&options));
         persist_session_options(&mut record, None);
         assert!(session_options_from_record(&record).is_none());
+    }
+
+    #[test]
+    fn no_options_and_no_isolation_yields_no_meta() {
+        assert_eq!(build_claude_code_options_meta(None, false), None);
+    }
+
+    #[test]
+    fn model_and_max_turns_map_into_claude_code_options() {
+        let options = SessionAgentOptions {
+            model: Some("gpt-5".into()),
+            max_turns: Some(3),
+            allowed_tools: Some(vec!["bash".into()]),
+            ..Default::default()
+        };
+        let meta = build_claude_code_options_meta(Some(&options), false).unwrap();
+        let claude_code = &meta["claudeCode"]["options"];
+        assert_eq!(claude_code["model"], "gpt-5");
+        assert_eq!(claude_code["maxTurns"], 3);
+        assert_eq!(claude_code["allowedTools"][0], "bash");
+        assert!(meta.get("systemPrompt").is_none());
+    }
+
+    #[test]
+    fn direct_system_prompt_is_a_plain_string_at_top_level() {
+        let options = SessionAgentOptions {
+            system_prompt: Some(SystemPromptOption::Direct("be terse".into())),
+            ..Default::default()
+        };
+        let meta = build_claude_code_options_meta(Some(&options), false).unwrap();
+        assert_eq!(meta["systemPrompt"], "be terse");
+        assert!(meta.get("claudeCode").is_none());
+    }
+
+    #[test]
+    fn append_system_prompt_is_an_object_at_top_level() {
+        let options = SessionAgentOptions {
+            system_prompt: Some(SystemPromptOption::Append {
+                append: "and be nice".into(),
+            }),
+            ..Default::default()
+        };
+        let meta = build_claude_code_options_meta(Some(&options), false).unwrap();
+        assert_eq!(meta["systemPrompt"]["append"], "and be nice");
+    }
+
+    #[test]
+    fn isolate_user_settings_adds_setting_sources_even_without_options() {
+        let meta = build_claude_code_options_meta(None, true).unwrap();
+        let sources = meta["claudeCode"]["options"]["settingSources"]
+            .as_array()
+            .unwrap();
+        assert_eq!(sources, &vec![Value::from("project"), Value::from("local")]);
+    }
+
+    #[test]
+    fn include_user_settings_env_prepends_user_source() {
+        unsafe {
+            std::env::set_var("ACPX_CLAUDE_INCLUDE_USER_SETTINGS", "1");
+        }
+        let sources = resolve_claude_code_setting_sources();
+        unsafe {
+            std::env::remove_var("ACPX_CLAUDE_INCLUDE_USER_SETTINGS");
+        }
+        assert_eq!(sources, vec!["user", "project", "local"]);
     }
 }

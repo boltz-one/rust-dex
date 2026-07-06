@@ -87,14 +87,16 @@ pub fn start_turn(
         .or(default_timeout_ms)
         .map(Duration::from_millis);
 
-    {
+    // Gap 6: capture the recorded prompt message id (previously discarded)
+    // so the turn task can check `has_agent_reply_after_prompt` on a timeout.
+    let prompt_message_id = {
         let mut conversation = connected.conversation.lock();
         record_prompt_submission(
             &mut conversation,
             &[InboundContent::Text(input.text.clone())],
             None,
-        );
-    }
+        )
+    };
 
     let (event_tx, event_rx) = smol::channel::bounded::<AcpRuntimeEvent>(EVENT_CHANNEL_CAPACITY);
     let (cancel_tx, cancel_rx) = oneshot::channel::<Option<String>>();
@@ -109,6 +111,7 @@ pub fn start_turn(
         session_id,
         content_blocks,
         timeout,
+        prompt_message_id,
         event_tx,
         cancel_rx,
         result_tx,

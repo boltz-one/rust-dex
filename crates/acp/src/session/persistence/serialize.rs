@@ -30,6 +30,8 @@ pub fn serialize_session_record_for_disk(record: &SessionRecord) -> Value {
 pub(crate) mod test_support {
     use std::collections::HashMap;
 
+    use indexmap::IndexMap;
+
     use crate::session::acpx_state::SessionAcpxState;
     use crate::session::conversation_model::{
         SessionAgentContent, SessionAgentMessage, SessionMessage, SessionToolResult,
@@ -111,7 +113,7 @@ pub(crate) mod test_support {
             updated_at: "2026-01-01T00:00:02Z".to_string(),
             cumulative_token_usage: Default::default(),
             cumulative_cost: None,
-            request_token_usage: HashMap::new(),
+            request_token_usage: IndexMap::new(),
             acpx: Some(SessionAcpxState::default()),
             imported_from: None,
             extra: Default::default(),

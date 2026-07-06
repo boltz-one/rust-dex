@@ -14,9 +14,11 @@
 use std::sync::Arc;
 
 use agent_client_protocol::schema::v1::SessionNotification;
+use parking_lot::Mutex;
 
+use super::state::{PermissionStats, PermissionStatsHandle};
 use crate::filesystem::FilesystemHandlers;
-use crate::permissions::PermissionRequestHandler;
+use crate::permissions::{PermissionEscalationEvent, PermissionPolicy, PermissionRequestHandler};
 use crate::terminal::TerminalManager;
 use crate::types::{NonInteractivePermissionPolicy, PermissionMode};
 
@@ -29,6 +31,18 @@ pub struct PermissionRequestWiring {
     pub mode: PermissionMode,
     pub non_interactive_policy: NonInteractivePermissionPolicy,
     pub handler: Option<Arc<dyn PermissionRequestHandler>>,
+    /// Gap 1: programmatic permission policy (autoApprove/autoDeny/escalate
+    /// rules). `None` = no policy overrides. Threaded from
+    /// `AcpRuntimeOptions.permission_policy` (ADR-7: no CLI/file loader).
+    pub policy: Option<PermissionPolicy>,
+    /// Gap 2 (ADR-8): fire-and-forget escalation audit callback, invoked
+    /// (best-effort, panic-isolated in the RPC handler) whenever the
+    /// `escalate` policy branch produces an escalation event without an
+    /// interactive handler to resolve it.
+    pub on_escalation: Option<Arc<dyn Fn(PermissionEscalationEvent) + Send + Sync>>,
+    /// Gap 25: shared permission-decision counters, incremented by the
+    /// `session/request_permission` RPC handler.
+    pub stats: PermissionStatsHandle,
 }
 
 impl Default for PermissionRequestWiring {
@@ -37,6 +51,9 @@ impl Default for PermissionRequestWiring {
             mode: PermissionMode::ApproveReads,
             non_interactive_policy: NonInteractivePermissionPolicy::Deny,
             handler: None,
+            policy: None,
+            on_escalation: None,
+            stats: Arc::new(Mutex::new(PermissionStats::default())),
         }
     }
 }

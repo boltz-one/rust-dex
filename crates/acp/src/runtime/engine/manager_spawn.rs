@@ -8,23 +8,104 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use agent_client_protocol::schema::v1::{SessionConfigId, SessionConfigValueId};
+
+use crate::agent_command::model_request::{
+    assert_requested_model_supported, resolve_requested_model_id,
+};
 use crate::agent_command::resolve_agent_program;
 use crate::auth_env::build_agent_environment;
 use crate::client::handlers::{ClientRequestHandlers, PermissionRequestWiring};
 use crate::client::{AcpClient, SpawnAgentOptions};
-use crate::filesystem::FilesystemHandlers;
+use crate::filesystem::{ClientOperation, FilesystemHandlers};
 use crate::session::conversation_model::iso_now;
+use crate::session::model_state::advertised_model_state;
 use crate::session::record::SessionRecord;
 use crate::terminal::{TerminalManager, TerminalManagerOptions};
 use crate::types::SessionResumePolicy;
 
-use super::connected_session::ConnectedSession;
+use super::connected_session::{ConnectedSession, drain_replay_notifications};
 use super::manager_support::{conversation_from_record, wrap_err};
 use super::reconnect::connect_and_load_session;
 use super::session_options::session_options_from_record;
 
 use crate::runtime::public::contract::AcpRuntimeOptions;
 use crate::runtime::public::errors::{AcpRuntimeError, AcpRuntimeErrorCode};
+
+/// Gap 12: after a session connects, if the caller's persisted
+/// `session_options.model` names a model, apply it to the live agent
+/// connection (mirroring acpx's `applyRequestedModelIfAdvertised`, called
+/// unconditionally — including for resumed sessions, per the phase's
+/// confirmed Locked-in Decision) and persist the resulting current-model-id
+/// onto the record. Failures are logged, not propagated — a session whose
+/// requested model can't be honored should still come up (matching acpx's
+/// own warn-and-continue behavior for this call site), just without the
+/// model actually switched.
+async fn apply_requested_model_if_advertised(client: &AcpClient, record: &mut SessionRecord) {
+    let Some(requested_model) = session_options_from_record(record).and_then(|o| o.model) else {
+        return;
+    };
+    if requested_model.trim().is_empty() {
+        return;
+    }
+
+    let agent_command = record.agent_command.clone();
+    let advertised = advertised_model_state(record.acpx.as_ref());
+    let warning = match assert_requested_model_supported(
+        &requested_model,
+        advertised.as_ref(),
+        Some(&agent_command),
+        false,
+    ) {
+        Ok(warning) => warning,
+        Err(err) => {
+            log::warn!(
+                "[acp] cannot apply requested model \"{requested_model}\": {}",
+                err.message
+            );
+            return;
+        }
+    };
+    if let Some(warning) = warning {
+        log::info!("[acp] {warning}");
+    }
+
+    let resolved_model_id =
+        resolve_requested_model_id(&requested_model, advertised.as_ref(), Some(&agent_command));
+    let config_id = advertised
+        .as_ref()
+        .and_then(|models| models.config_id.clone())
+        .unwrap_or_else(|| "model".to_string());
+    let session_id =
+        agent_client_protocol::schema::v1::SessionId::new(record.acp_session_id.clone());
+
+    match client
+        .set_session_config_option(
+            session_id,
+            SessionConfigId::new(config_id),
+            SessionConfigValueId::new(resolved_model_id.clone()),
+        )
+        .await
+    {
+        Ok(response) => {
+            let current_model_id =
+                crate::session::model_application::current_model_id_from_set_model_response(
+                    Some(response.config_options.as_slice()),
+                    Some(&resolved_model_id),
+                );
+            crate::session::config_options::apply_config_options_to_record(
+                record,
+                Some(response.config_options),
+            );
+            if let (Some(current_model_id), Some(acpx)) = (current_model_id, record.acpx.as_mut()) {
+                acpx.current_model_id = Some(current_model_id);
+            }
+        }
+        Err(err) => {
+            log::warn!("[acp] failed to apply requested model \"{requested_model}\": {err}");
+        }
+    }
+}
 
 /// Ports the `AcpClient` construction + `connectAndLoadSession` half of
 /// acpx's `withConnectedSession`/manager.ts session setup.
@@ -58,9 +139,19 @@ pub(super) async fn spawn_connected_session(
     }
     let cwd = PathBuf::from(&record.cwd);
     let session_env = session_options_from_record(&record).and_then(|o| o.env);
-    let env = build_agent_environment(std::env::vars(), None, session_env.as_ref(), cfg!(windows));
+    let env = build_agent_environment(
+        std::env::vars(),
+        options.auth_credentials.as_ref(),
+        session_env.as_ref(),
+        cfg!(windows),
+    );
 
     let (notifications_tx, notifications_rx) = smol::channel::unbounded();
+    // Gap 20: filesystem/terminal client-operation events flow through this
+    // channel to the active turn task (drained there, persisted via
+    // `record_client_operation` + streamed as `AcpRuntimeEvent::ClientOperation`).
+    let (operations_tx, operations_rx) = smol::channel::unbounded::<ClientOperation>();
+    let fs_operations_tx = operations_tx.clone();
     let filesystem = Arc::new(
         FilesystemHandlers::new(
             &cwd,
@@ -74,15 +165,23 @@ pub(super) async fn spawn_connected_session(
                 "failed to sandbox session cwd",
                 err,
             )
-        })?,
+        })?
+        .with_on_operation(Arc::new(move |op| {
+            let _ = fs_operations_tx.try_send(op);
+        })),
     );
-    let terminal = Arc::new(TerminalManager::new(TerminalManagerOptions {
-        cwd: cwd.clone(),
-        permission_mode: options.permission_mode,
-        non_interactive_policy: options.non_interactive_permissions,
-        handler: options.on_permission_request.clone(),
-        kill_grace: None,
-    }));
+    let terminal = Arc::new(
+        TerminalManager::new(TerminalManagerOptions {
+            cwd: cwd.clone(),
+            permission_mode: options.permission_mode,
+            non_interactive_policy: options.non_interactive_permissions,
+            handler: options.on_permission_request.clone(),
+            kill_grace: None,
+        })
+        .with_on_operation(Arc::new(move |op| {
+            let _ = operations_tx.try_send(op);
+        })),
+    );
     let handlers = ClientRequestHandlers {
         filesystem: Some(filesystem),
         terminal: Some(terminal),
@@ -90,6 +189,9 @@ pub(super) async fn spawn_connected_session(
             mode: options.permission_mode,
             non_interactive_policy: options.non_interactive_permissions,
             handler: options.on_permission_request.clone(),
+            policy: options.permission_policy.clone(),
+            on_escalation: options.on_permission_escalation.clone(),
+            stats: Default::default(),
         },
         notifications: Some(notifications_tx),
     };
@@ -104,6 +206,7 @@ pub(super) async fn spawn_connected_session(
         is_gemini,
         is_devin,
         handlers,
+        auth_credentials: options.auth_credentials.clone(),
     })
     .await
     .map_err(|err| {
@@ -136,6 +239,26 @@ pub(super) async fn spawn_connected_session(
         )
     })?;
 
+    // Gap 16: `connect_and_load_session`'s `session/load`/`session/resume`
+    // RPC may have triggered the agent to replay historical `session/update`
+    // notifications onto `notifications_rx` before this `ConnectedSession`
+    // (and therefore any live consumer) exists — drain and discard whatever
+    // accumulated so a turn started right after `ensure_session` doesn't see
+    // stale replay content ahead of its own live updates. See
+    // `connected_session::drain_replay_notifications`'s docs for why a
+    // synchronous channel-empty check is sufficient here (no wall-clock
+    // idle wait needed).
+    let suppressed_replay_updates = if connect_result.resumed {
+        drain_replay_notifications(&notifications_rx)
+    } else {
+        0
+    };
+
+    // Gap 12: apply a caller-requested model to the live connection
+    // unconditionally (resumed or freshly created alike), persisting the
+    // resulting current-model-id onto the record before it's saved below.
+    apply_requested_model_if_advertised(&client, &mut record).await;
+
     record.pid = client.state().last_known_pid;
     record.agent_started_at = Some(client.state().agent_started_at.to_rfc3339());
     record.closed = false;
@@ -160,7 +283,9 @@ pub(super) async fn spawn_connected_session(
         record,
         conversation,
         notifications_rx,
+        operations_rx,
         options.mcp_servers.clone(),
         options.prompt_queue_capacity,
+        suppressed_replay_updates,
     ))
 }

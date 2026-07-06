@@ -1,10 +1,10 @@
 ---
 title: "Fix 35 completeness gaps found in 4-way acpx-to-crates/acp port audit"
 description: "Wire orphaned/dead-code functions into real call paths and fix field-level behavioral divergences from acpx across permissions, reconnect, session persistence, and Windows spawn."
-status: pending
+status: done
 priority: P1
 effort: 41h
-branch: main
+branch: feat/acp-completeness
 lane: high-risk
 tags: [acp, agent-client-protocol, rust-port, completeness-audit, security, reconnect]
 created: 2026-07-06
@@ -30,15 +30,15 @@ Other unrelated Claude Code sessions may be concurrently active in this same rep
 
 | # | Phase | Tier | Gaps | Status | Effort | File-ownership (primary) |
 |---|-------|------|------|--------|--------|---------------------------|
-| 1 | [Permission Policy, Escalation Audit Trail, Authenticate RPC, Permission Stats](./phase-01-permission-policy-authenticate-wiring.md) | HIGH | 1,2,3,24,25 | pending | 6h | `client/{handshake,handlers,state}.rs`, `runtime/public/contract/options.rs`, `permissions/*`, `runtime/engine/manager_spawn.rs` |
-| 2 | [Claude Session-Create Timeout + Reconnect Hardening + Prompt-Turn Timeout Recovery](./phase-02-reconnect-hardening-claude-timeout.md) | HIGH | 4,5,6 | pending | 10h | `runtime/engine/reconnect/*`, `runtime/engine/prompt_turn/*`, `agent_command/` (new claude quirks), `tests/fixtures/fake_agent/`, `tests/runtime_lifecycle.rs` |
-| 3 | [Conversation Trim Determinism (IndexMap) + Import Agent-Match Security Check](./phase-03-conversation-trim-import-security.md) | HIGH | 7,8 | pending | 3h | `Cargo.toml` (root+crate), `session/conversation_model/{trim,conversation}.rs`, `session/record.rs`, `session/import/agent_match.rs` |
-| 4 | [Session Lifecycle Wiring: Close RPC, Control-Error Wrapping, Model Application, Reconnect Reconciliation, Load Drain](./phase-04-session-lifecycle-reconnect-model-state.md) | MEDIUM | 9,10,11,12,15,16,23 | pending | 6h | `client/mod.rs`, `runtime/engine/manager/queue_control.rs`, `runtime/engine/connected_session.rs`, `runtime/engine/manager_spawn.rs`, `runtime/engine/session_options.rs`, `runtime/engine/reconnect/mod.rs`, `session/model_application.rs`, `session/model_state.rs`, `agent_command/model_support.rs` |
-| 5 | [Runtime Contract Dynamism: Capabilities, Self-Describing Handle, Session Validation](./phase-05-runtime-contract-dynamism.md) | MEDIUM | 13,14,34 | pending | 3h | `runtime/engine/manager/{mod,status}.rs`, `runtime/public/{handle_state,shared}.rs` |
-| 6 | [Conversation/Tool-Use Fidelity + ClientOperation Progress Events](./phase-06-conversation-fidelity-client-operations.md) | MEDIUM | 17,18,19,20 | pending | 4h | `session/conversation_model/{trim,tool_use,tool_call,record}.rs`, `filesystem.rs`, `terminal/mod.rs`, `runtime/public/events/types.rs` |
-| 7 | [Windows Batch-Shell Agent Spawn + Claude Executable Resolution](./phase-07-windows-batch-shell-spawn.md) | MEDIUM | 21 (27 deferred, ADR-10) | pending | 3h | `client/spawn.rs`, `agent_command/spawn_options.rs` |
-| 8 | [Agent-Command Quirks & Shutdown/Persistence Refinements](./phase-08-agent-quirks-shutdown-persistence.md) | LOW | 22,26,28,29 | pending | 3h | `client/shutdown.rs`, `agent_command/{command_args,registry}.rs`, `session/persistence/repository/{close,prune}.rs` |
-| 9 | [Test Coverage, Legacy Migration Fidelity, Liveness Cleanup, Architecture ADR](./phase-09-test-coverage-adr-cleanup.md) | LOW | 30,31,32,33,35 | pending | 3h | `session/persistence/parse.rs`, `session/model_state.rs`, `session/conversation_model/trim.rs` (doc only), `permissions/resolve_tests.rs`, `runtime/engine/reconnect/liveness.rs`, `docs/decisions/0010-*.md` |
+| 1 | [Permission Policy, Escalation Audit Trail, Authenticate RPC, Permission Stats](./phase-01-permission-policy-authenticate-wiring.md) | HIGH | 1,2,3,24,25 | done | 6h | `client/{handshake,handlers,state}.rs`, `runtime/public/contract/options.rs`, `permissions/*`, `runtime/engine/manager_spawn.rs` |
+| 2 | [Claude Session-Create Timeout + Reconnect Hardening + Prompt-Turn Timeout Recovery](./phase-02-reconnect-hardening-claude-timeout.md) | HIGH | 4,5,6 | done | 10h | `runtime/engine/reconnect/*`, `runtime/engine/prompt_turn/*`, `agent_command/` (new claude quirks), `tests/fixtures/fake_agent/`, `tests/runtime_lifecycle.rs` |
+| 3 | [Conversation Trim Determinism (IndexMap) + Import Agent-Match Security Check](./phase-03-conversation-trim-import-security.md) | HIGH | 7,8 | done | 3h | `Cargo.toml` (root+crate), `session/conversation_model/{trim,conversation}.rs`, `session/record.rs`, `session/import/agent_match.rs` |
+| 4 | [Session Lifecycle Wiring: Close RPC, Control-Error Wrapping, Model Application, Reconnect Reconciliation, Load Drain](./phase-04-session-lifecycle-reconnect-model-state.md) | MEDIUM | 9,10,11,12,15,16,23 | done | 6h | `client/mod.rs`, `runtime/engine/manager/queue_control.rs`, `runtime/engine/connected_session.rs`, `runtime/engine/manager_spawn.rs`, `runtime/engine/session_options.rs`, `runtime/engine/reconnect/mod.rs`, `session/model_application.rs`, `session/model_state.rs`, `agent_command/model_support.rs` |
+| 5 | [Runtime Contract Dynamism: Capabilities, Self-Describing Handle, Session Validation](./phase-05-runtime-contract-dynamism.md) | MEDIUM | 13,14,34 | done | 3h | `runtime/engine/manager/{mod,status}.rs`, `runtime/public/{handle_state,shared}.rs` |
+| 6 | [Conversation/Tool-Use Fidelity + ClientOperation Progress Events](./phase-06-conversation-fidelity-client-operations.md) | MEDIUM | 17,18,19,20 | done | 4h | `session/conversation_model/{trim,tool_use,tool_call,record}.rs`, `filesystem.rs`, `terminal/mod.rs`, `runtime/public/events/types.rs` |
+| 7 | [Windows Batch-Shell Agent Spawn + Claude Executable Resolution](./phase-07-windows-batch-shell-spawn.md) | MEDIUM | 21 (27 deferred, ADR-10) | done | 3h | `client/spawn.rs`, `agent_command/spawn_options.rs` |
+| 8 | [Agent-Command Quirks & Shutdown/Persistence Refinements](./phase-08-agent-quirks-shutdown-persistence.md) | LOW | 22,26,28,29 | done | 3h | `client/shutdown.rs`, `agent_command/{command_args,registry}.rs`, `session/persistence/repository/{close,prune}.rs` |
+| 9 | [Test Coverage, Legacy Migration Fidelity, Liveness Cleanup, Architecture ADR](./phase-09-test-coverage-adr-cleanup.md) | LOW | 30,31,32,33,35 | done | 3h | `session/persistence/parse.rs`, `session/model_state.rs`, `session/conversation_model/trim.rs` (doc only), `permissions/resolve_tests.rs`, `runtime/engine/reconnect/liveness.rs`, `docs/decisions/0010-*.md` |
 
 **Total: 41h.**
 
