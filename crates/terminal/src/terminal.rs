@@ -37,6 +37,17 @@ use alacritty_terminal::term::{Config, Term};
 use alacritty_terminal::tty;
 use alacritty_terminal::vte::ansi::{Color as AnsiColor, NamedColor};
 
+// Re-export `alacritty_terminal`'s own pure-data index/selection/search/mode
+// types directly (ADR #1: no custom wrapper types — they add a lossy
+// conversion layer for zero behavioural gain, and the "no GPUI" boundary is
+// about not depending on `gpui`, not about hiding alacritty's data shapes).
+pub use alacritty_terminal::grid::Scroll;
+pub use alacritty_terminal::index::{Column, Direction, Line, Point, Side};
+pub use alacritty_terminal::selection::{Selection, SelectionRange, SelectionType};
+pub use alacritty_terminal::term::TermMode;
+pub use alacritty_terminal::term::search::{Match, RegexSearch};
+pub use alacritty_terminal::vte::ansi::CursorShape;
+
 /// Terminal grid size in rows/columns, plus the pixel size of one cell
 /// (alacritty needs cell pixel size to compute `WindowSize` for the PTY,
 /// even though this crate never rasterizes anything itself).
@@ -191,6 +202,167 @@ pub struct TerminalCell {
     pub underline: bool,
 }
 
+/// Converts one `alacritty_terminal` grid cell into a style-resolved
+/// [`TerminalCell`]. Shared by [`Terminal::screen_cells`],
+/// [`Terminal::scrollback_cells`] and [`Terminal::cell_at`].
+fn convert_cell(cell: &alacritty_terminal::term::cell::Cell) -> TerminalCell {
+    TerminalCell {
+        text: cell.c,
+        fg: resolve_color(cell.fg),
+        bg: resolve_color(cell.bg),
+        bold: cell.flags.contains(Flags::BOLD),
+        italic: cell.flags.contains(Flags::ITALIC),
+        underline: cell.flags.intersects(
+            Flags::UNDERLINE
+                | Flags::DOUBLE_UNDERLINE
+                | Flags::UNDERCURL
+                | Flags::DOTTED_UNDERLINE
+                | Flags::DASHED_UNDERLINE,
+        ),
+    }
+}
+
+/// A mouse button, for [`Terminal::mouse_report_sgr`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MouseButton {
+    Left,
+    Middle,
+    Right,
+}
+
+/// The kind of mouse event being reported, for [`Terminal::mouse_report_sgr`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MouseEventKind {
+    Down,
+    Up,
+    Drag,
+    ScrollUp,
+    ScrollDown,
+}
+
+/// Keyboard modifiers active during a mouse event (SGR encodes them into the
+/// button byte).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MouseModifiers {
+    pub shift: bool,
+    pub alt: bool,
+    pub control: bool,
+}
+
+/// A detected hyperlink span in the grid — text plus its inclusive grid
+/// `Point` range. Data-only: this crate never opens anything (the view layer
+/// does, gated on an explicit click).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HyperlinkMatch {
+    pub text: String,
+    /// True for URL-scheme matches (`https://…`); reserved `false` for future
+    /// path-like matches, which the view layer resolves against a cwd.
+    pub is_url: bool,
+    pub start: Point,
+    pub end: Point,
+}
+
+/// The cursor's grid position, shape, and visibility — read by the view layer
+/// to paint it.
+#[derive(Clone, Copy, Debug)]
+pub struct CursorState {
+    pub point: Point,
+    pub shape: CursorShape,
+    pub visible: bool,
+}
+
+/// Encodes a mouse event in the SGR mouse protocol (`\x1b[<{cb};{col};{row}{M|m}`,
+/// 1-based coordinates). Pure function (no mode gating) so it can be
+/// byte-exact unit-tested; [`Terminal::mouse_report_sgr`] gates it on the
+/// terminal actually having a mouse-reporting mode enabled.
+fn encode_sgr_mouse(
+    button: MouseButton,
+    kind: MouseEventKind,
+    point: Point,
+    mods: MouseModifiers,
+) -> Vec<u8> {
+    let mut cb: u8 = match kind {
+        MouseEventKind::ScrollUp => 64,
+        MouseEventKind::ScrollDown => 65,
+        _ => match button {
+            MouseButton::Left => 0,
+            MouseButton::Middle => 1,
+            MouseButton::Right => 2,
+        },
+    };
+    if matches!(kind, MouseEventKind::Drag) {
+        cb += 32; // motion bit
+    }
+    if mods.shift {
+        cb += 4;
+    }
+    if mods.alt {
+        cb += 8;
+    }
+    if mods.control {
+        cb += 16;
+    }
+    // SGR coordinates are 1-based; `m` is the release final byte, `M` press.
+    let col = point.column.0 + 1;
+    let row = point.line.0 + 1;
+    let final_byte = if matches!(kind, MouseEventKind::Up) {
+        'm'
+    } else {
+        'M'
+    };
+    format!("\x1b[<{cb};{col};{row}{final_byte}").into_bytes()
+}
+
+/// Removes any embedded bracketed-paste end-marker (`\x1b[201~`) from pasted
+/// text, so untrusted clipboard content cannot terminate paste mode early and
+/// have its remainder run as typed input (bracketed-paste injection — xterm
+/// applies the same guard).
+fn strip_paste_terminator(text: &str) -> String {
+    text.replace("\x1b[201~", "")
+}
+
+/// All regex matches in the grid (incl. scrollback), left-to-right/top-to-
+/// bottom, computed against an ALREADY-LOCKED `Term`. Taking the locked term
+/// (rather than re-locking) lets callers that need the match text keep the
+/// same grid snapshot for the subsequent `bounds_to_string` — the grid's ring
+/// buffer can rotate between separate `lock()` calls (background PTY reader),
+/// which would invalidate the returned history-relative `Point`s.
+fn search_all_locked(term: &Term<EventProxy>, search: &mut RegexSearch) -> Vec<Match> {
+    let grid = term.grid();
+    let cols = grid.columns();
+    let start = Point {
+        line: Line(-(grid.history_size() as i32)),
+        column: Column(0),
+    };
+    let end = Point {
+        line: Line(grid.screen_lines() as i32 - 1),
+        column: Column(cols.saturating_sub(1)),
+    };
+    let mut matches = Vec::new();
+    let mut origin = start;
+    while let Some(m) = term.regex_search_right(search, origin, end) {
+        let match_end = *m.end();
+        matches.push(m);
+        // Advance one cell past the match end (wrapping at the last column) so
+        // the next search doesn't re-find the same span.
+        origin = if match_end.column.0 + 1 >= cols {
+            Point {
+                line: Line(match_end.line.0 + 1),
+                column: Column(0),
+            }
+        } else {
+            Point {
+                line: match_end.line,
+                column: Column(match_end.column.0 + 1),
+            }
+        };
+        if origin.line.0 > end.line.0 || matches.len() >= 10_000 {
+            break;
+        }
+    }
+    matches
+}
+
 /// Forwards `alacritty_terminal`'s internal notifications (redraw-needed,
 /// title change, PTY exited, bell) to an [`async_channel`] so a caller (the
 /// GPUI-side `TerminalView`) can `cx.notify()` on the next one without this
@@ -275,7 +447,7 @@ impl Terminal {
             EventProxy(tx.clone()),
         )));
 
-        let event_loop = EventLoop::new(term.clone(), EventProxy(tx.clone()), pty, false, false)?;
+        let event_loop = EventLoop::new(term.clone(), EventProxy(tx), pty, false, false)?;
         let notifier = Notifier(event_loop.channel());
         // `EventLoop::spawn` starts the dedicated PTY-reading OS thread and
         // returns its `JoinHandle`; this crate doesn't need to join it —
@@ -344,25 +516,258 @@ impl Terminal {
         let grid = term.grid();
         (0..grid.screen_lines())
             .map(|line_ix| {
-                grid[alacritty_terminal::index::Line(line_ix as i32)]
+                grid[Line(line_ix as i32)]
                     .into_iter()
-                    .map(|cell| TerminalCell {
-                        text: cell.c,
-                        fg: resolve_color(cell.fg),
-                        bg: resolve_color(cell.bg),
-                        bold: cell.flags.contains(Flags::BOLD),
-                        italic: cell.flags.contains(Flags::ITALIC),
-                        underline: cell.flags.intersects(
-                            Flags::UNDERLINE
-                                | Flags::DOUBLE_UNDERLINE
-                                | Flags::UNDERCURL
-                                | Flags::DOTTED_UNDERLINE
-                                | Flags::DASHED_UNDERLINE,
-                        ),
-                    })
+                    .map(convert_cell)
                     .collect()
             })
             .collect()
+    }
+
+    // ---- Selection (mouse-driven text selection; view layer supplies grid
+    // points from pixel coordinates via `point_for_pixel`) ----
+
+    /// Begins a selection of the given kind anchored at `point`/`side`.
+    /// Replaces any existing selection.
+    pub fn selection_start(&self, ty: SelectionType, point: Point, side: Side) {
+        self.term.lock().selection = Some(Selection::new(ty, point, side));
+    }
+
+    /// Extends the in-progress selection to `point`/`side` (no-op if none).
+    pub fn selection_update(&self, point: Point, side: Side) {
+        if let Some(selection) = self.term.lock().selection.as_mut() {
+            selection.update(point, side);
+        }
+    }
+
+    /// Clears any active selection.
+    pub fn selection_clear(&self) {
+        self.term.lock().selection = None;
+    }
+
+    /// The current selection's text (for copy), or `None` if nothing selected.
+    pub fn selection_text(&self) -> Option<String> {
+        self.term.lock().selection_to_string()
+    }
+
+    /// The current selection's resolved grid range, or `None`.
+    pub fn selection_range(&self) -> Option<SelectionRange> {
+        let term = self.term.lock();
+        term.selection.as_ref().and_then(|s| s.to_range(&term))
+    }
+
+    // ---- Scroll & scrollback ----
+
+    /// Scrolls the display (wheel / scrollbar / keys). [`Scroll::Delta`] with a
+    /// positive delta moves up into history.
+    pub fn scroll(&self, scroll: Scroll) {
+        self.term.lock().scroll_display(scroll);
+    }
+
+    /// How many lines the display is scrolled up into history (0 = bottom).
+    pub fn display_offset(&self) -> usize {
+        self.term.lock().grid().display_offset()
+    }
+
+    /// Total lines available including scrollback history (screen + history).
+    pub fn total_lines(&self) -> i32 {
+        self.term.lock().grid().total_lines() as i32
+    }
+
+    /// Styled cells for a range of grid lines. Line indices are alacritty's:
+    /// `0..screen_lines` is the visible screen, NEGATIVE indices reach into
+    /// scrollback history. Out-of-range lines are clamped to the valid
+    /// `-(history) ..= screen_lines-1` window (empty result if the clamp
+    /// collapses the range).
+    pub fn scrollback_cells(&self, lines: std::ops::Range<i32>) -> Vec<Vec<TerminalCell>> {
+        let term = self.term.lock();
+        let grid = term.grid();
+        let min = -(grid.history_size() as i32);
+        let max = grid.screen_lines() as i32; // exclusive
+        let start = lines.start.max(min);
+        let end = lines.end.min(max);
+        if start >= end {
+            return Vec::new();
+        }
+        (start..end)
+            .map(|l| grid[Line(l)].into_iter().map(convert_cell).collect())
+            .collect()
+    }
+
+    /// A single cell at `point` (for hyperlink hover / hit-testing), or `None`
+    /// if the point is outside the grid.
+    pub fn cell_at(&self, point: Point) -> Option<TerminalCell> {
+        let term = self.term.lock();
+        let grid = term.grid();
+        if point.line.0 < -(grid.history_size() as i32)
+            || point.line.0 >= grid.screen_lines() as i32
+            || point.column.0 >= grid.columns()
+        {
+            return None;
+        }
+        Some(convert_cell(&grid[point.line][point.column]))
+    }
+
+    // ---- Search ----
+
+    /// Compiles a search pattern into a reusable [`RegexSearch`] handle (kept
+    /// live by the caller across next/prev navigation, matching Zed).
+    pub fn search_compile(pattern: &str) -> anyhow::Result<RegexSearch> {
+        RegexSearch::new(pattern).map_err(|e| anyhow::anyhow!("invalid search regex: {e}"))
+    }
+
+    /// Finds the next match from `from` in `direction` (the origin cell is
+    /// included), searching the whole grid incl. scrollback. `None` if no
+    /// match.
+    pub fn search_next(
+        &self,
+        search: &mut RegexSearch,
+        from: Point,
+        direction: Direction,
+    ) -> Option<Match> {
+        let term = self.term.lock();
+        let grid = term.grid();
+        let cols = grid.columns();
+        match direction {
+            Direction::Right => {
+                let end = Point {
+                    line: Line(grid.screen_lines() as i32 - 1),
+                    column: Column(cols.saturating_sub(1)),
+                };
+                term.regex_search_right(search, from, end)
+            }
+            Direction::Left => {
+                let end = Point {
+                    line: Line(-(grid.history_size() as i32)),
+                    column: Column(0),
+                };
+                term.regex_search_left(search, from, end)
+            }
+        }
+    }
+
+    /// All matches in the grid (incl. scrollback), left-to-right, top-to-
+    /// bottom. Bounded to avoid pathological loops.
+    pub fn search_all(&self, search: &mut RegexSearch) -> Vec<Match> {
+        let term = self.term.lock();
+        search_all_locked(&term, search)
+    }
+
+    // ---- Modes, mouse reporting, pixel hit-testing ----
+
+    /// The terminal's current mode flags (bracketed paste, alt-screen, mouse
+    /// reporting, etc.) — read-only state the child process sets.
+    pub fn mode(&self) -> TermMode {
+        *self.term.lock().mode()
+    }
+
+    /// Encodes a mouse event as SGR mouse-report bytes to write to the PTY, or
+    /// `None` if the program has not negotiated SGR mouse reporting (the view
+    /// layer should then handle the event locally, e.g. as a text selection).
+    /// SGR only (ADR #2): a program that enabled a tracking mode (1000/1002/
+    /// 1003) WITHOUT SGR (1006) expects the legacy X10/UTF8 binary encoding,
+    /// which this crate does not emit — so it returns `None` and degrades to
+    /// local selection rather than sending bytes the program would misparse.
+    pub fn mouse_report_sgr(
+        &self,
+        button: MouseButton,
+        kind: MouseEventKind,
+        point: Point,
+        mods: MouseModifiers,
+    ) -> Option<Vec<u8>> {
+        let mode = self.mode();
+        // Require BOTH a tracking mode (what events to report) AND SGR
+        // encoding (how) — SGR_MOUSE is a separate flag from MOUSE_MODE.
+        if !mode.intersects(TermMode::MOUSE_MODE) || !mode.contains(TermMode::SGR_MOUSE) {
+            return None;
+        }
+        Some(encode_sgr_mouse(button, kind, point, mods))
+    }
+
+    /// Maps a pixel offset within the terminal's content area to a grid
+    /// [`Point`], accounting for the current scrollback `display_offset`.
+    pub fn point_for_pixel(
+        &self,
+        x_px: f32,
+        y_px: f32,
+        cell_width: f32,
+        cell_height: f32,
+    ) -> Point {
+        let term = self.term.lock();
+        let grid = term.grid();
+        let cols = grid.columns() as i32;
+        let screen = grid.screen_lines() as i32;
+        let display_offset = grid.display_offset() as i32;
+        let col = ((x_px / cell_width).floor() as i32).clamp(0, (cols - 1).max(0));
+        let visible_row = ((y_px / cell_height).floor() as i32).clamp(0, (screen - 1).max(0));
+        Point {
+            // Displayed row 0 is line `-display_offset` when scrolled up.
+            line: Line(visible_row - display_offset),
+            column: Column(col as usize),
+        }
+    }
+
+    // ---- Bracketed paste ----
+
+    /// Writes pasted text to the PTY, wrapping it in bracketed-paste markers
+    /// (`\x1b[200~`…`\x1b[201~`) iff the child process enabled
+    /// [`TermMode::BRACKETED_PASTE`] — otherwise writes it raw.
+    pub fn write_paste(&self, text: &str) {
+        if self.mode().contains(TermMode::BRACKETED_PASTE) {
+            self.write_input(b"\x1b[200~".to_vec());
+            self.write_input(strip_paste_terminator(text).into_bytes());
+            self.write_input(b"\x1b[201~".to_vec());
+        } else {
+            self.write_input(text.as_bytes().to_vec());
+        }
+    }
+
+    // ---- Hyperlinks (data-only) ----
+
+    /// Detects URL hyperlinks in the grid (fixed scheme set: http/https/ssh/
+    /// git/file — not caller-configurable, see plan). Returns text + inclusive
+    /// grid `Point` range; opening is the view layer's job. Path-like targets
+    /// (needing a cwd) are resolved in the view layer, not here.
+    pub fn find_hyperlinks(&self) -> Vec<HyperlinkMatch> {
+        const URL_REGEX: &str = "(https|http|ssh|git|file)://[^ \t]+";
+        let Ok(mut regex) = RegexSearch::new(URL_REGEX) else {
+            return Vec::new();
+        };
+        // Search AND resolve match text under a single lock: the grid ring
+        // buffer can rotate between separate `lock()` calls, invalidating the
+        // history-relative match `Point`s (TOCTOU → wrong text or a panic in
+        // `bounds_to_string`'s grid indexing).
+        let term = self.term.lock();
+        search_all_locked(&term, &mut regex)
+            .into_iter()
+            .map(|m| {
+                let start = *m.start();
+                let end = *m.end();
+                HyperlinkMatch {
+                    text: term.bounds_to_string(start, end),
+                    is_url: true,
+                    start,
+                    end,
+                }
+            })
+            .collect()
+    }
+
+    // ---- Cursor ----
+
+    /// The cursor's current grid position, shape, and visibility (the view
+    /// layer paints it).
+    pub fn cursor(&self) -> CursorState {
+        let term = self.term.lock();
+        let content = term.renderable_content();
+        CursorState {
+            point: content.cursor.point,
+            shape: content.cursor.shape,
+            // `shape` is alacritty's single source of truth for visibility: it
+            // is `Hidden` exactly when the cursor should not paint (folds in
+            // both SHOW_CURSOR and the vi-mode exception), so derive from it.
+            visible: content.cursor.shape != CursorShape::Hidden,
+        }
     }
 
     /// Ends the PTY session: signals the child process's controlling
@@ -585,6 +990,192 @@ mod tests {
             cell.fg,
             resolve_color(AnsiColor::Named(NamedColor::Red)),
             "expected 'Z' to be colored red via the real SGR escape sequence"
+        );
+    }
+
+    /// Byte-exact SGR mouse encoding for hand-verified cases (pure function,
+    /// no PTY). Left press at col 5 / row 3 (1-based) -> `\x1b[<0;5;3M`.
+    #[test]
+    fn encode_sgr_mouse_matches_documented_format() {
+        let down = encode_sgr_mouse(
+            MouseButton::Left,
+            MouseEventKind::Down,
+            Point {
+                line: Line(2),
+                column: Column(4),
+            },
+            MouseModifiers::default(),
+        );
+        assert_eq!(down, b"\x1b[<0;5;3M");
+
+        // Release uses the lowercase final byte `m`.
+        let up = encode_sgr_mouse(
+            MouseButton::Left,
+            MouseEventKind::Up,
+            Point {
+                line: Line(2),
+                column: Column(4),
+            },
+            MouseModifiers::default(),
+        );
+        assert_eq!(up, b"\x1b[<0;5;3m");
+
+        // Right button + shift: cb = 2 + 4 = 6.
+        let shift_right = encode_sgr_mouse(
+            MouseButton::Right,
+            MouseEventKind::Down,
+            Point {
+                line: Line(0),
+                column: Column(0),
+            },
+            MouseModifiers {
+                shift: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(shift_right, b"\x1b[<6;1;1M");
+    }
+
+    /// Polls the visible screen until `marker` appears, returning its (row,
+    /// col) grid position. Panics if not found within the timeout.
+    fn wait_for_marker(terminal: &Terminal, marker: &str) -> (i32, usize) {
+        for _ in 0..50 {
+            std::thread::sleep(Duration::from_millis(20));
+            for (row, line) in terminal.screen_cells().iter().enumerate() {
+                let text: String = line.iter().map(|c| c.text).collect();
+                if let Some(col) = text.find(marker) {
+                    return (row as i32, col);
+                }
+            }
+        }
+        panic!("marker {marker:?} never appeared on screen");
+    }
+
+    /// Real PTY: print a marker, select its cells, assert `selection_text`
+    /// round-trips the printed text.
+    #[test]
+    fn selection_round_trip_captures_printed_text() {
+        let shell = tty::Shell::new("/bin/sh".to_string(), Vec::new());
+        let (terminal, _events) =
+            Terminal::spawn_with_shell(shell, small_size()).expect("failed to spawn PTY shell");
+        terminal.write_input(b"printf 'HELLOSEL\\n'\n".as_slice());
+
+        let marker = "HELLOSEL";
+        let (row, col) = wait_for_marker(&terminal, marker);
+        terminal.selection_start(
+            SelectionType::Simple,
+            Point {
+                line: Line(row),
+                column: Column(col),
+            },
+            Side::Left,
+        );
+        terminal.selection_update(
+            Point {
+                line: Line(row),
+                column: Column(col + marker.len() - 1),
+            },
+            Side::Right,
+        );
+        let selected = terminal.selection_text().unwrap_or_default();
+        assert!(terminal.selection_range().is_some(), "range should resolve");
+        terminal.shutdown();
+        assert!(
+            selected.contains(marker),
+            "selection text {selected:?} should contain {marker:?}"
+        );
+    }
+
+    /// Real PTY: search finds a printed marker via a compiled `RegexSearch`.
+    #[test]
+    fn search_finds_printed_marker() {
+        let shell = tty::Shell::new("/bin/sh".to_string(), Vec::new());
+        let (terminal, _events) =
+            Terminal::spawn_with_shell(shell, small_size()).expect("failed to spawn PTY shell");
+        terminal.write_input(b"printf 'FINDMEMARKER\\n'\n".as_slice());
+        wait_for_marker(&terminal, "FINDMEMARKER");
+
+        let mut regex = Terminal::search_compile("FINDMEMARKER").expect("valid regex");
+        let hit = terminal.search_next(
+            &mut regex,
+            Point {
+                line: Line(0),
+                column: Column(0),
+            },
+            Direction::Right,
+        );
+        terminal.shutdown();
+        assert!(hit.is_some(), "search should locate the printed marker");
+    }
+
+    /// Real PTY: printing more lines than the screen holds pushes rows into
+    /// scrollback; scrolling up raises `display_offset` and `scrollback_cells`
+    /// exposes negative-index history rows (concrete proof scrollback capacity
+    /// exists — ADR #3).
+    #[test]
+    fn scroll_and_scrollback_expose_history() {
+        let shell = tty::Shell::new("/bin/sh".to_string(), Vec::new());
+        let (terminal, _events) =
+            Terminal::spawn_with_shell(shell, small_size()).expect("failed to spawn PTY shell");
+        // 100 lines into a 24-row screen -> ~76 lines scroll into history.
+        terminal.write_input(b"seq 1 100\n".as_slice());
+        wait_for_marker(&terminal, "100");
+
+        assert_eq!(terminal.display_offset(), 0, "starts pinned at the bottom");
+        terminal.scroll(Scroll::Delta(5));
+        let offset = terminal.display_offset();
+        let history = terminal.scrollback_cells(-5..0);
+        terminal.shutdown();
+
+        assert!(offset >= 1, "scrolling up should raise display_offset");
+        assert!(
+            !history.is_empty(),
+            "scrollback_cells must expose history rows after 100 lines"
+        );
+    }
+
+    /// Real PTY: a printed URL is detected by `find_hyperlinks`.
+    #[test]
+    fn find_hyperlinks_detects_printed_url() {
+        let shell = tty::Shell::new("/bin/sh".to_string(), Vec::new());
+        let (terminal, _events) =
+            Terminal::spawn_with_shell(shell, small_size()).expect("failed to spawn PTY shell");
+        terminal.write_input(b"printf 'https://example.com/foo\\n'\n".as_slice());
+        wait_for_marker(&terminal, "https://example.com");
+
+        let links = terminal.find_hyperlinks();
+        terminal.shutdown();
+        assert!(
+            links
+                .iter()
+                .any(|l| l.is_url && l.text.contains("https://example.com")),
+            "expected a URL hyperlink match, got {links:?}"
+        );
+    }
+
+    /// Bracketed-paste injection guard: an embedded end-marker in pasted text
+    /// is stripped so it can't terminate paste mode early.
+    #[test]
+    fn strip_paste_terminator_removes_embedded_end_marker() {
+        assert_eq!(
+            strip_paste_terminator("safe\x1b[201~rm -rf /\n"),
+            "saferm -rf /\n"
+        );
+        assert_eq!(strip_paste_terminator("no marker here"), "no marker here");
+    }
+
+    /// A freshly spawned `/bin/sh` (no readline bracketed-paste) does not have
+    /// `BRACKETED_PASTE` set — proves `mode()` reads real terminal state.
+    #[test]
+    fn mode_reads_bracketed_paste_state() {
+        let shell = tty::Shell::new("/bin/sh".to_string(), Vec::new());
+        let (terminal, _events) =
+            Terminal::spawn_with_shell(shell, small_size()).expect("failed to spawn PTY shell");
+        let mode = terminal.mode();
+        terminal.shutdown();
+        assert!(
+            !mode.contains(TermMode::BRACKETED_PASTE),
+            "plain /bin/sh should not enable bracketed paste"
         );
     }
 }
