@@ -116,7 +116,7 @@ impl RenderOnce for TabBar {
             .id("tabs")
             .flex_grow()
             .overflow_x_scroll()
-            .when(style == TabBarStyle::Underline, |this| this.gap_8())
+            .when(style == TabBarStyle::Underline, |this| this.gap_2())
             .when(style == TabBarStyle::Pills, |this| this.gap_2())
             .when_some(self.scroll_handle, |this, scroll_handle| {
                 this.track_scroll(&scroll_handle)
@@ -128,19 +128,12 @@ impl RenderOnce for TabBar {
             // its horizontal overflow via `.overflow_x_scroll()`, and an outer
             // clip on this `relative` wrapper made the `Tab` children
             // non-hit-testable (clicks at their real bounds silently no-op'd).
+            // No bottom border line (borderless header per the requested
+            // mockup); the tabs row fills the bar directly.
             TabBarStyle::Underline => div()
                 .relative()
                 .flex_1()
                 .h_full()
-                .child(
-                    div()
-                        .absolute()
-                        .top_0()
-                        .left_0()
-                        .size_full()
-                        .border_b_1()
-                        .border_color(semantic::border_muted(cx)),
-                )
                 .child(tabs_row)
                 .into_any_element(),
             TabBarStyle::Pills => div()
@@ -166,9 +159,6 @@ impl RenderOnce for TabBar {
                         .flex_none()
                         .gap(DynamicSpacing::Base04.rems(cx))
                         .px(DynamicSpacing::Base06.rems(cx))
-                        .border_b_1()
-                        .border_r_1()
-                        .border_color(semantic::border_muted(cx))
                         .children(self.start_children),
                 )
             })
@@ -179,9 +169,6 @@ impl RenderOnce for TabBar {
                         .flex_none()
                         .gap(DynamicSpacing::Base04.rems(cx))
                         .px(DynamicSpacing::Base06.rems(cx))
-                        .border_color(semantic::border_muted(cx))
-                        .border_b_1()
-                        .border_l_1()
                         .children(self.end_children),
                 )
             })

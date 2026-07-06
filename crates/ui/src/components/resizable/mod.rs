@@ -124,16 +124,21 @@ impl RenderOnce for ResizableHandle {
             .when(!is_horizontal, |this| this.h(px(1.)).w_full())
             .bg(semantic::border(cx));
 
+        // Flush panels: negative margins collapse the handle's net layout size
+        // to ~1px (the visible line) so adjacent panels sit edge-to-edge, while
+        // the handle itself stays a 7px grab target (resize on hover) centered
+        // on the seam.
         self.div
+            .relative()
             .flex_shrink_0()
             .flex()
             .items_center()
             .justify_center()
             .when(is_horizontal, |this| {
-                this.w(px(8.)).h_full().cursor_col_resize()
+                this.w(px(7.)).mx(px(-3.)).h_full().cursor_col_resize()
             })
             .when(!is_horizontal, |this| {
-                this.h(px(8.)).w_full().cursor_row_resize()
+                this.h(px(7.)).my(px(-3.)).w_full().cursor_row_resize()
             })
             .child(line)
     }
