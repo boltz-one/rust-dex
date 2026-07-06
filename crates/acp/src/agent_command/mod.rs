@@ -26,6 +26,7 @@
 //! for the actual probe spawn+timeout logic.
 
 pub mod agent_detect;
+pub mod claude_quirks;
 pub mod codex_compat;
 pub mod command_args;
 pub mod command_probe;
@@ -39,6 +40,9 @@ pub mod spawn_options;
 pub use agent_detect::{
     is_claude_acp_command, is_copilot_acp_command, is_cursor_acp_command, is_devin_acp_command,
     is_gemini_acp_command,
+};
+pub use claude_quirks::{
+    build_claude_acp_session_create_timeout_message, resolve_claude_acp_session_create_timeout_ms,
 };
 pub use codex_compat::{is_codex_acp_command, is_legacy_zed_codex_acp_invocation};
 pub use command_args::{
@@ -58,7 +62,7 @@ pub use model_support::{
 };
 pub use registry::{
     DEFAULT_AGENT_NAME, built_in_agent_registry, list_built_in_agents, merge_agent_registry,
-    normalize_agent_name, resolve_agent_command,
+    normalize_agent_name, resolve_agent_command, resolve_compatible_config_id,
 };
 
 /// Resolves a `--agent` value (a registered name, alias, or raw command

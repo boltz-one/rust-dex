@@ -66,7 +66,12 @@ pub async fn probe_runtime(options: &AcpRuntimeOptions) -> RuntimeHealthReport {
         }
     }
 
-    let env = build_agent_environment(std::env::vars(), None, None, cfg!(windows));
+    let env = build_agent_environment(
+        std::env::vars(),
+        options.auth_credentials.as_ref(),
+        None,
+        cfg!(windows),
+    );
     let client = AcpClient::spawn(SpawnAgentOptions {
         program: &parts.command,
         args: &parts.args,
@@ -77,6 +82,7 @@ pub async fn probe_runtime(options: &AcpRuntimeOptions) -> RuntimeHealthReport {
         is_gemini,
         is_devin,
         handlers: Default::default(),
+        auth_credentials: options.auth_credentials.clone(),
     })
     .await;
 

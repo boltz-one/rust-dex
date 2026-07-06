@@ -62,6 +62,11 @@ use agent_client_protocol::schema::v1::{
     AgentCapabilities, LoadSessionRequest, McpServer, ResumeSessionRequest, SessionId,
 };
 
+use crate::agent_command::model_support::{SessionModelState, model_state_from_session_response};
+use crate::agent_command::{
+    build_claude_acp_session_create_timeout_message, is_claude_acp_command,
+    resolve_claude_acp_session_create_timeout_ms, split_command_line,
+};
 use crate::agent_session_id::extract_agent_session_id;
 use crate::client::AcpClient;
 use crate::control::with_timeout;
@@ -72,9 +77,12 @@ use crate::error_normalization::{
 use crate::error_shapes::is_acp_resource_not_found_error;
 use crate::session::config_options::apply_config_options_to_record;
 use crate::session::conversation_model::SessionConversation;
+use crate::session::mode_preference::{get_desired_config_options, get_desired_model_id};
+use crate::session::model_state::{advertised_model_state, apply_reconnected_model_state};
 use crate::session::record::SessionRecord;
 use crate::types::SessionResumePolicy;
 
+use super::session_options::{build_claude_code_options_meta, session_options_from_record};
 use replay::{has_preferences_to_replay, replay_fresh_session_preferences};
 
 /// Result of [`connect_and_load_session`].
@@ -83,6 +91,37 @@ pub struct ConnectAndLoadSessionResult {
     pub agent_session_id: Option<String>,
     pub resumed: bool,
     pub load_error: Option<String>,
+}
+
+/// Gap 6/15/23: the response-derived model-state inputs
+/// [`crate::session::model_state::apply_reconnected_model_state`] needs,
+/// computed once per acquisition RPC response (shared by
+/// [`create_fresh_session`] and [`acquire_via_rpc`]) so gap 15's
+/// `legacyModelMetadataPresent` flag and gap 23's `model_state_from_session_response`
+/// call aren't duplicated.
+struct AcquiredModelState {
+    config_options_present: bool,
+    legacy_model_metadata_present: bool,
+    session_models: Option<SessionModelState>,
+}
+
+fn model_state_from_response(
+    config_options: Option<&[agent_client_protocol::schema::v1::SessionConfigOption]>,
+    meta: Option<&agent_client_protocol::schema::v1::Meta>,
+) -> AcquiredModelState {
+    let legacy_meta_value = meta.map(|m| serde_json::Value::Object(m.clone()));
+    let legacy_model_metadata_present = legacy_meta_value
+        .as_ref()
+        .is_some_and(|m| m.get("models").is_some());
+    let session_models = model_state_from_session_response(
+        config_options.unwrap_or(&[]),
+        legacy_meta_value.as_ref(),
+    );
+    AcquiredModelState {
+        config_options_present: config_options.is_some(),
+        legacy_model_metadata_present,
+        session_models,
+    }
 }
 
 const UNSUPPORTED_SESSION_LOAD_CODES: [i32; 2] = [-32601, -32602];
@@ -139,6 +178,9 @@ struct Acquired {
     resumed: bool,
     created_fresh: bool,
     load_error: Option<String>,
+    /// Gap 15/23: the response-derived model-state inputs
+    /// `connect_and_load_session`'s tail feeds into `apply_reconnected_model_state`.
+    model_state: AcquiredModelState,
 }
 
 /// Ports the shared body of `resumeRuntimeSession`/`loadRuntimeSession`:
@@ -192,6 +234,7 @@ async fn acquire_via_rpc(
     match raw_result {
         Ok((meta, config_options)) => {
             let agent_session_id = extract_agent_session_id(meta.as_ref());
+            let model_state = model_state_from_response(config_options.as_deref(), meta.as_ref());
             apply_config_options_to_record(record, config_options);
             Ok(Acquired {
                 session_id,
@@ -199,6 +242,7 @@ async fn acquire_via_rpc(
                 resumed: true,
                 created_fresh: false,
                 load_error: None,
+                model_state,
             })
         }
         Err(rpc_error) => {
@@ -237,8 +281,44 @@ async fn create_fresh_session(
     load_error: Option<String>,
 ) -> Result<Acquired> {
     let cwd = PathBuf::from(&record.cwd);
-    let response = with_timeout(client.session_new(cwd, mcp_servers.to_vec()), timeout).await??;
+    // Gap 4: Claude Code's ACP adapter can hang indefinitely on `session/new`.
+    // For a Claude command, substitute the caller's generic timeout with the
+    // Claude-specific default (env-overridable, 60s) and map an expiry to the
+    // dedicated `ClaudeAcpSessionCreateTimeout` diagnostic instead of a
+    // generic timeout, matching acpx.
+    let is_claude = split_command_line(&record.agent_command)
+        .map(|parts| is_claude_acp_command(&parts.command, &parts.args))
+        .unwrap_or(false);
+    let effective_timeout = if is_claude {
+        Some(resolve_claude_acp_session_create_timeout_ms())
+    } else {
+        timeout
+    };
+    // Gap 10: attach `_meta.claudeCode.options` (built from the record's
+    // persisted `SessionAgentOptions`) unconditionally — non-Claude agents
+    // ignore unrecognized `_meta` keys per ACP's extensibility convention.
+    // `isolate_user_settings` (acpx's `isolateUserSettings`) mirrors
+    // acpx's own `createSession` call site: gated on this being a Claude
+    // ACP command specifically.
+    let session_agent_options = session_options_from_record(record);
+    let meta = build_claude_code_options_meta(session_agent_options.as_ref(), is_claude);
+    let response = match with_timeout(
+        client.session_new_with_meta(cwd, mcp_servers.to_vec(), meta),
+        effective_timeout,
+    )
+    .await
+    {
+        Ok(result) => result?,
+        Err(AcpError::Timeout(_)) if is_claude => {
+            return Err(AcpError::ClaudeAcpSessionCreateTimeout(
+                build_claude_acp_session_create_timeout_message(),
+            ));
+        }
+        Err(other) => return Err(other),
+    };
     let agent_session_id = extract_agent_session_id(response.meta.as_ref());
+    let model_state =
+        model_state_from_response(response.config_options.as_deref(), response.meta.as_ref());
     apply_config_options_to_record(record, response.config_options.clone());
     Ok(Acquired {
         session_id: response.session_id,
@@ -246,6 +326,7 @@ async fn create_fresh_session(
         resumed: false,
         created_fresh: true,
         load_error,
+        model_state,
     })
 }
 
@@ -343,7 +424,22 @@ pub async fn connect_and_load_session(
         );
     }
 
+    // Gap 15: whether replay would touch `config_options` at all (model or
+    // config-option replay — mode replay alone never adds config options),
+    // computed from the record's PRE-replay "desired" state. Combined with
+    // whether replay actually ran below, this approximates acpx's
+    // `resolveConfigOptionsPresenceAfterReplay` (`initiallyPresent ||
+    // configReplay.replayed || (modelReplay.replayed &&
+    // modelReplay.configOptionsPresent)`) without needing `replay.rs` (out
+    // of this phase's file scope) to return the finer per-step replay
+    // results.
+    let replay_would_touch_config_options = acquired.created_fresh
+        && (get_desired_model_id(record.acpx.as_ref()).is_some()
+            || !get_desired_config_options(record.acpx.as_ref()).is_empty());
+    let mut replay_ran = false;
+
     if acquired.created_fresh && has_preferences_to_replay(record) {
+        replay_ran = true;
         let replay_result = replay_fresh_session_preferences(
             client,
             acquired.session_id.clone(),
@@ -359,10 +455,115 @@ pub async fn connect_and_load_session(
         }
     }
 
+    // Gap 15/23: reconcile the record's persisted model/config-option state
+    // against what this connection actually observed, regardless of which
+    // acquisition path ran (Requirement 5). If replay ran and touched model
+    // or config-option state, `record.acpx` already reflects the
+    // post-replay config options (via `apply_config_options_to_record`
+    // inside `replay.rs`) — re-derive `session_models` from that current
+    // state rather than the pre-replay acquisition response so the
+    // reconciliation sees the same values the replay just applied.
+    let config_options_present = acquired.model_state.config_options_present
+        || (replay_ran && replay_would_touch_config_options);
+    let session_models = if replay_ran && replay_would_touch_config_options {
+        advertised_model_state(record.acpx.as_ref())
+    } else {
+        acquired.model_state.session_models.clone()
+    };
+    apply_reconnected_model_state(
+        record,
+        session_models.as_ref(),
+        config_options_present,
+        acquired.model_state.legacy_model_metadata_present,
+        acquired.created_fresh,
+    );
+
     Ok(ConnectAndLoadSessionResult {
         session_id: acquired.session_id,
         agent_session_id: record.agent_session_id.clone(),
         resumed: acquired.resumed,
         load_error: acquired.load_error,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    //! Gap 5: direct unit coverage for the acquisition-path selection and
+    //! fallback-classification logic — the reconnect state machine was
+    //! previously the highest-risk file in the crate with zero unit tests.
+    use super::*;
+    use crate::session::conversation_model::conversation::create_session_conversation;
+
+    fn capabilities(resume: bool, load: bool) -> AgentCapabilities {
+        let mut caps = AgentCapabilities::new();
+        caps.load_session = load;
+        if resume {
+            caps.session_capabilities.resume = Some(Default::default());
+        }
+        caps
+    }
+
+    #[test]
+    fn resume_capability_wins_over_load_and_same_session() {
+        assert!(matches!(
+            choose_acquisition_path(&capabilities(true, true), true),
+            AcquisitionPath::Resume
+        ));
+        assert!(matches!(
+            choose_acquisition_path(&capabilities(true, false), false),
+            AcquisitionPath::Resume
+        ));
+    }
+
+    #[test]
+    fn load_chosen_when_only_load_advertised() {
+        assert!(matches!(
+            choose_acquisition_path(&capabilities(false, true), true),
+            AcquisitionPath::Load
+        ));
+    }
+
+    #[test]
+    fn require_same_session_when_neither_and_same_session_only() {
+        assert!(matches!(
+            choose_acquisition_path(&capabilities(false, false), true),
+            AcquisitionPath::RequireSameSession
+        ));
+    }
+
+    #[test]
+    fn create_fresh_when_neither_and_not_same_session_only() {
+        assert!(matches!(
+            choose_acquisition_path(&capabilities(false, false), false),
+            AcquisitionPath::CreateFresh
+        ));
+    }
+
+    #[test]
+    fn fallback_true_for_unsupported_method_codes() {
+        let conversation = create_session_conversation(None);
+        for code in UNSUPPORTED_SESSION_LOAD_CODES {
+            let err = AcpRpcError::new(code, "method not found");
+            assert!(
+                should_fallback_to_new_session(&err, &conversation),
+                "code {code} should fall back to a fresh session"
+            );
+        }
+    }
+
+    #[test]
+    fn fallback_true_for_internal_error_when_no_agent_messages() {
+        let conversation = create_session_conversation(None);
+        let err = AcpRpcError::new(-32603, "internal error");
+        assert!(should_fallback_to_new_session(&err, &conversation));
+    }
+
+    #[test]
+    fn fallback_false_for_unclassified_code_with_no_agent_messages() {
+        let conversation = create_session_conversation(None);
+        // -32000 is neither resource-not-found, unsupported, query-closed,
+        // nor the -32603 internal-error code -> must NOT silently fall back.
+        let err = AcpRpcError::new(-32000, "server error");
+        assert!(!should_fallback_to_new_session(&err, &conversation));
+    }
 }

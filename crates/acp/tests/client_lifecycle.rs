@@ -28,6 +28,7 @@ fn spawn_handshake_and_shutdown() {
             is_gemini: false,
             is_devin: false,
             handlers: Default::default(),
+            auth_credentials: None,
         })
         .await
         .expect("spawn+handshake should succeed");
@@ -54,6 +55,7 @@ fn sigterm_ignoring_agent_escalates_to_sigkill() {
             is_gemini: false,
             is_devin: false,
             handlers: Default::default(),
+            auth_credentials: None,
         })
         .await
         .expect("spawn+handshake should succeed");
@@ -77,6 +79,7 @@ fn session_new_returns_typed_response() {
             is_gemini: false,
             is_devin: false,
             handlers: Default::default(),
+            auth_credentials: None,
         })
         .await
         .expect("spawn+handshake should succeed");
@@ -116,6 +119,7 @@ fn devin_spawn_advertises_windsurf_client_identity() {
             is_gemini: false,
             is_devin: true,
             handlers: Default::default(),
+            auth_credentials: None,
         })
         .await
         .expect("spawn+handshake should succeed");
@@ -177,6 +181,7 @@ fn gemini_startup_timeout_kills_hung_agent_and_reports_diagnostic() {
             is_gemini: true,
             is_devin: false,
             handlers: Default::default(),
+            auth_credentials: None,
         })
         .await;
 
@@ -208,6 +213,7 @@ fn non_devin_spawn_advertises_real_client_identity() {
             is_gemini: false,
             is_devin: false,
             handlers: Default::default(),
+            auth_credentials: None,
         })
         .await
         .expect("spawn+handshake should succeed");
@@ -226,6 +232,101 @@ fn non_devin_spawn_advertises_real_client_identity() {
                 .unwrap()
                 .get("_meta")
                 .is_none()
+        );
+
+        client.shutdown().await;
+    });
+}
+
+#[test]
+fn authenticate_selects_advertised_method_when_credential_present() {
+    // Gap 3: the agent advertises an auth method at `initialize`, and the
+    // app supplies a matching credential — `AcpClient::spawn` must send the
+    // `authenticate` RPC selecting that method before returning. The fake
+    // agent records the received `methodId` and echoes it back under
+    // `session/new`'s `_meta.authenticatedMethod`, so this asserts on the
+    // real wire exchange, not just this crate's internal call.
+    smol::block_on(async {
+        let mut env = HashMap::new();
+        env.insert(
+            "ACP_FAKE_AGENT_AUTH_METHOD".to_string(),
+            "oauth".to_string(),
+        );
+        let creds = HashMap::from([("oauth".to_string(), "token-123".to_string())]);
+        let client = AcpClient::spawn(SpawnAgentOptions {
+            program: fake_agent_path(),
+            args: &[],
+            cwd: Path::new("/tmp"),
+            env: &env,
+            client_name: "boltz-acp-test".to_string(),
+            terminal: false,
+            is_gemini: false,
+            is_devin: false,
+            handlers: Default::default(),
+            auth_credentials: Some(creds),
+        })
+        .await
+        .expect("spawn+handshake+authenticate should succeed");
+
+        let response = client
+            .session_new(Path::new("/tmp").to_path_buf(), vec![])
+            .await
+            .expect("session/new should succeed");
+        let authenticated = response
+            .meta
+            .as_ref()
+            .and_then(|m| m.get("authenticatedMethod"))
+            .and_then(|v| v.as_str());
+        assert_eq!(
+            authenticated,
+            Some("oauth"),
+            "client should have sent authenticate with the advertised method id"
+        );
+
+        client.shutdown().await;
+    });
+}
+
+#[test]
+fn authenticate_skipped_when_no_credential_resolves() {
+    // Gap 3 (Requirement 4 / plan Unresolved Questions #6 default): the agent
+    // advertises an auth method but no credential resolves (no app map, no
+    // ambient `ACP_AUTH_*`) — the client must proceed WITHOUT sending
+    // `authenticate`, letting the agent reject a later RPC if it truly
+    // requires auth, rather than hanging or failing the handshake.
+    smol::block_on(async {
+        let mut env = HashMap::new();
+        env.insert(
+            "ACP_FAKE_AGENT_AUTH_METHOD".to_string(),
+            "oauth".to_string(),
+        );
+        let client = AcpClient::spawn(SpawnAgentOptions {
+            program: fake_agent_path(),
+            args: &[],
+            cwd: Path::new("/tmp"),
+            env: &env,
+            client_name: "boltz-acp-test".to_string(),
+            terminal: false,
+            is_gemini: false,
+            is_devin: false,
+            handlers: Default::default(),
+            auth_credentials: None,
+        })
+        .await
+        .expect("spawn should still succeed without authenticating");
+
+        let response = client
+            .session_new(Path::new("/tmp").to_path_buf(), vec![])
+            .await
+            .expect("session/new should succeed");
+        let authenticated = response
+            .meta
+            .as_ref()
+            .and_then(|m| m.get("authenticatedMethod"))
+            .and_then(|v| v.as_str());
+        assert_eq!(
+            authenticated, None,
+            "no credential -> authenticate must not be sent"
         );
 
         client.shutdown().await;

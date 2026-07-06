@@ -14,6 +14,7 @@
 //! `@agentclientprotocol/sdk` rather than re-deriving their shape).
 
 use agent_client_protocol::schema::v1::AgentCapabilities;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -84,7 +85,7 @@ pub struct SessionRecord {
     #[serde(default)]
     pub cumulative_cost: Option<SessionUsageCost>,
     #[serde(default)]
-    pub request_token_usage: std::collections::HashMap<String, SessionTokenUsage>,
+    pub request_token_usage: IndexMap<String, SessionTokenUsage>,
     #[serde(default)]
     pub acpx: Option<SessionAcpxState>,
     #[serde(default)]

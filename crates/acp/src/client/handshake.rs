@@ -22,20 +22,24 @@
 //! is why [`ClientRequestHandlers`] is threaded in here rather than
 //! attached by the runtime engine after the fact.
 
+use std::collections::HashMap;
+
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
-    ClientCapabilities, CreateTerminalRequest, CreateTerminalResponse, FileSystemCapabilities,
-    Implementation, InitializeRequest, InitializeResponse, KillTerminalRequest,
-    KillTerminalResponse, Meta, ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest,
-    ReleaseTerminalResponse, RequestPermissionRequest, RequestPermissionResponse,
-    SessionNotification, TerminalOutputRequest, TerminalOutputResponse, WaitForTerminalExitRequest,
-    WaitForTerminalExitResponse, WriteTextFileRequest, WriteTextFileResponse,
+    AuthenticateRequest, ClientCapabilities, CreateTerminalRequest, CreateTerminalResponse,
+    FileSystemCapabilities, Implementation, InitializeRequest, InitializeResponse,
+    KillTerminalRequest, KillTerminalResponse, Meta, ReadTextFileRequest, ReadTextFileResponse,
+    ReleaseTerminalRequest, ReleaseTerminalResponse, RequestPermissionRequest,
+    RequestPermissionResponse, SessionNotification, TerminalOutputRequest, TerminalOutputResponse,
+    WaitForTerminalExitRequest, WaitForTerminalExitResponse, WriteTextFileRequest,
+    WriteTextFileResponse,
 };
 use agent_client_protocol::{Agent, Client, ConnectionTo, Error as AcpRpcError};
 use futures::channel::oneshot;
 
 use super::handlers::ClientRequestHandlers;
 use super::transport::AgentByteStreams;
+use crate::auth_env::{read_env_credential, resolve_configured_auth_credential};
 use crate::error::{AcpError, Result};
 use crate::version::crate_version;
 
@@ -121,19 +125,61 @@ fn rpc_error_from(err: &AcpError) -> AcpRpcError {
     AcpRpcError::new(code, err.to_string())
 }
 
+/// Gap 3: ports `authenticateIfRequired`/`selectAuthMethod`. If the agent's
+/// `initialize` response advertised any auth methods, pick the first one for
+/// which a credential resolves — either from the app-supplied
+/// `auth_credentials` map or the ambient `ACP_AUTH_*` environment — and send
+/// the `authenticate` RPC to select it (the credential itself already
+/// reaches the agent via its subprocess environment, see
+/// [`crate::auth_env::build_agent_environment`]). When no credential
+/// resolves for any advertised method, proceed unauthenticated (Requirement
+/// 4 / plan Unresolved Questions #6 decided default): this crate has no
+/// `authPolicy: "fail"` option, and letting the agent reject the first real
+/// RPC yields a clearer error than a silent hang. An `authenticate` RPC that
+/// *does* run but fails is a real connection failure and propagates.
+async fn authenticate_if_required(
+    cx: &ConnectionTo<Agent>,
+    init_response: &InitializeResponse,
+    auth_credentials: Option<&HashMap<String, String>>,
+) -> std::result::Result<(), AcpRpcError> {
+    if init_response.auth_methods.is_empty() {
+        return Ok(());
+    }
+    let selected = init_response.auth_methods.iter().find(|method| {
+        let id = method.id().0.as_ref();
+        resolve_configured_auth_credential(id, auth_credentials).is_some()
+            || read_env_credential(id).is_some()
+    });
+    let Some(method) = selected else {
+        log::debug!(
+            "agent advertised {} auth method(s) but no credential resolved; proceeding unauthenticated",
+            init_response.auth_methods.len()
+        );
+        return Ok(());
+    };
+    cx.send_request(AuthenticateRequest::new(method.id().clone()))
+        .block_task()
+        .await
+        .map(|_response| ())
+}
+
 /// Performs the `initialize` handshake over `transport` and leaves the
 /// connection running in the background. `client_name` is this crate's
 /// advertised `clientInfo.name` (e.g. `"boltz-acp"` or an app-provided
 /// override); `terminal` advertises `terminal/*` capability support;
 /// `is_devin` swaps the advertised `clientInfo`/`clientCapabilities` for
 /// Devin's Windsurf compatibility identity (see this module's docs above);
-/// `handlers` wires up the agent-initiated RPCs (see module docs).
+/// `handlers` wires up the agent-initiated RPCs (see module docs);
+/// `auth_credentials` is the app-supplied auth-method credential map used to
+/// select an `authenticate` method after `initialize` (gap 3, see
+/// [`authenticate_if_required`]).
 pub async fn spawn_and_initialize(
     transport: AgentByteStreams,
     client_name: String,
     terminal: bool,
     is_devin: bool,
     handlers: ClientRequestHandlers,
+    auth_credentials: Option<HashMap<String, String>>,
 ) -> Result<RunningConnection> {
     let (ready_tx, ready_rx) = oneshot::channel::<
         std::result::Result<(ConnectionTo<Agent>, InitializeResponse), AcpRpcError>,
@@ -208,18 +254,47 @@ pub async fn spawn_and_initialize(
                     let permission = permission.clone();
                     async move {
                         cx.spawn(async move {
-                            let result: std::result::Result<RequestPermissionResponse, AcpError> =
-                                crate::permissions::resolve_permission_request(
+                            // Gap 1/2: use the full decision-tree function so
+                            // the caller-supplied `policy` actually applies and
+                            // the escalation audit event is surfaced (the
+                            // response-only wrapper hardcoded `None` for policy
+                            // and discarded the escalation).
+                            let resolved =
+                                crate::permissions::resolve_permission_request_with_details(
                                     &req,
                                     permission.mode,
                                     permission.non_interactive_policy,
-                                    None,
+                                    permission.policy.as_ref(),
                                     permission.handler.as_deref(),
                                 )
                                 .await;
-                            match result {
-                                Ok(response) => responder.respond(response),
-                                Err(err) => responder.respond_with_error(rpc_error_from(&err)),
+                            match resolved {
+                                Ok(resolved) => {
+                                    let escalation = resolved.escalation;
+                                    let response = resolved.response;
+                                    // Gap 25: count the resolved decision.
+                                    let class = crate::permissions::classify_permission_decision(
+                                        &req, &response,
+                                    );
+                                    permission.stats.lock().record(class);
+                                    // Gap 2 (ADR-8): fire-and-forget escalation
+                                    // audit callback, panic-isolated so a
+                                    // misbehaving caller can't poison this RPC
+                                    // response path.
+                                    if let (Some(cb), Some(event)) =
+                                        (&permission.on_escalation, escalation)
+                                    {
+                                        let cb = cb.clone();
+                                        let _ = std::panic::catch_unwind(
+                                            std::panic::AssertUnwindSafe(|| cb(event)),
+                                        );
+                                    }
+                                    responder.respond(response)
+                                }
+                                Err(err) => {
+                                    permission.stats.lock().record_error();
+                                    responder.respond_with_error(rpc_error_from(&err))
+                                }
                             }
                         })?;
                         Ok(())
@@ -394,6 +469,16 @@ pub async fn spawn_and_initialize(
 
                 match cx.send_request(request).block_task().await {
                     Ok(response) => {
+                        // Gap 3: select an auth method before handing the
+                        // connection to the caller. A failure here is a
+                        // connection failure (surfaced on `ready_tx`).
+                        if let Err(auth_error) =
+                            authenticate_if_required(&cx, &response, auth_credentials.as_ref())
+                                .await
+                        {
+                            let _ = ready_tx.send(Err(auth_error.clone()));
+                            return Err(auth_error);
+                        }
                         let _ = ready_tx.send(Ok((cx.clone(), response)));
                         // Park until told to shut down; connect_with tears
                         // the transport down once this closure returns.

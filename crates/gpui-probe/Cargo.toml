@@ -1,0 +1,47 @@
+[package]
+# Published on crates.io under the `boltz-` tree prefix; the Rust import name
+# stays `gpui_probe` (see [lib] below), so consumers write
+# `boltz-gpui-probe = "0.1"` and `use gpui_probe::...`.
+name = "boltz-gpui-probe"
+version = "0.1.0"
+description = "Shared element-tree core for a GPUI inspector overlay + in-process UI test driver"
+license = "Apache-2.0"
+keywords = ["gpui", "testing", "inspector", "ui", "ui-testing"]
+categories = ["development-tools::testing", "gui"]
+readme = "README.md"
+edition.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "gpui_probe"
+
+[dependencies]
+gpui = { workspace = true }
+rustc-hash = { workspace = true }
+
+[features]
+default = []
+inspector = []   # Phase 05 overlay/panel (gpui-probe's own feature, not a boltz-gpui passthrough)
+semantic = []    # Phase 06 Role/Label selectors (needs newer boltz-gpui); off by default
+# Enables the in-process test driver (TestHarness) + gpui's test-support. A
+# consumer adds gpui-probe as a DEV-dependency with this feature; release builds
+# (default features) never compile the driver, so no consumer links test-support.
+# gpui-probe's own tests/examples must be run with `--features test-support`.
+test-support = ["gpui/test-support"]
+
+[dev-dependencies]
+# Self-dependency enabling `test-support` so the crate's OWN tests/examples
+# compile the driver (TestHarness) without needing `--features test-support` on
+# the CLI — and so rust-analyzer resolves it. Dev-dependencies never propagate to
+# downstream consumers, so release builds stay driver-free / test-support-free.
+boltz-gpui-probe = { path = ".", features = ["test-support"] }
+# Snapshot testing (Phase 04). Dev-only: the library exposes serialization-free
+# tree-text (crate::snapshot); tests assert it via insta.
+insta = "1"
+
+# Headless demo of the inspector overlay; needs both the inspector UI and the
+# test-support harness used to stand up a window without a platform backend.
+[[example]]
+name = "inspector_demo"
+required-features = ["inspector", "test-support"]

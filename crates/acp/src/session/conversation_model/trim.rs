@@ -8,6 +8,8 @@
 //! per-field char-limit trim applied to whatever messages remain, then the
 //! `request_token_usage` map is capped last.
 
+use serde_json::Value;
+
 use super::conversation::SessionConversation;
 use super::limits::{
     MAX_RUNTIME_AGENT_TEXT_CHARS, MAX_RUNTIME_MESSAGES, MAX_RUNTIME_REQUEST_TOKEN_USAGE,
@@ -19,7 +21,16 @@ use super::message::{
 
 /// Ports `trimRuntimeText`: truncates to `max_chars`, appending `...` when
 /// truncation actually happened (matching acpx's `slice(0, max - 3) + "..."`
-/// exactly, including its behavior for `max_chars < 3`).
+/// including its behavior for `max_chars < 3`).
+///
+/// `max_chars` counts Unicode scalar values (`.chars()`), *not* UTF-16 code
+/// units the way acpx's `string.length`/`slice` does — a divergence for
+/// text containing astral-plane characters (e.g. some emoji), which JS
+/// counts as 2 UTF-16 units but this counts as 1 scalar value. Exact parity
+/// with acpx's truncation point only holds for BMP-only text; for text with
+/// astral-plane characters near the truncation boundary this crate will
+/// keep slightly more characters (by scalar-value count) than acpx would
+/// (by UTF-16-unit count).
 pub fn trim_runtime_text(value: &str, max_chars: usize) -> String {
     if value.chars().count() <= max_chars {
         return value.to_string();
@@ -42,17 +53,13 @@ pub fn trim_conversation_for_runtime(conversation: &mut SessionConversation) {
 
     if conversation.request_token_usage.len() > MAX_RUNTIME_REQUEST_TOKEN_USAGE {
         // acpx keeps the *last* N entries in insertion order
-        // (`Object.entries(...).slice(-N)`); a `HashMap` has no stable
-        // insertion order, so this port approximates it by keeping an
-        // arbitrary N entries. Phase 4/6 (which own live request tracking)
-        // should prefer an ordered map if exact "most recent" semantics
-        // become load-bearing.
-        let keep: Vec<_> = conversation
-            .request_token_usage
-            .drain()
-            .take(MAX_RUNTIME_REQUEST_TOKEN_USAGE)
-            .collect();
-        conversation.request_token_usage = keep.into_iter().collect();
+        // (`Object.entries(...).slice(-N)`). `IndexMap` preserves insertion
+        // order, so dropping from the front until only `N` entries remain
+        // matches acpx's `slice(-N)` exactly.
+        let drop = conversation.request_token_usage.len() - MAX_RUNTIME_REQUEST_TOKEN_USAGE;
+        for _ in 0..drop {
+            conversation.request_token_usage.shift_remove_index(0);
+        }
     }
 }
 
@@ -72,6 +79,16 @@ fn trim_runtime_message(message: &mut SessionMessage) {
             for result in agent.tool_results.values_mut() {
                 if let SessionToolResultContent::Text(text) = &mut result.content {
                     *text = trim_runtime_text(text, MAX_RUNTIME_TOOL_IO_CHARS);
+                }
+                // Ports acpx's `typeof result.output === "string"` guard in
+                // `trimRuntimeToolResult`: only a raw string `output` is
+                // trimmed; object/array outputs are left byte-for-byte
+                // unchanged (gap 17).
+                if let Some(Value::String(text)) = &result.output {
+                    result.output = Some(Value::String(trim_runtime_text(
+                        text,
+                        MAX_RUNTIME_TOOL_IO_CHARS,
+                    )));
                 }
             }
         }
@@ -98,7 +115,9 @@ fn trim_runtime_agent_content(content: &mut SessionAgentContent) {
 mod tests {
     use super::*;
     use crate::session::conversation_model::conversation::create_session_conversation;
-    use crate::session::conversation_model::message::{SessionAgentMessage, SessionUserMessage};
+    use crate::session::conversation_model::message::{
+        SessionAgentMessage, SessionToolResult, SessionUserMessage,
+    };
 
     #[test]
     fn trim_runtime_text_truncates_and_appends_ellipsis() {
@@ -148,5 +167,76 @@ mod tests {
         };
         assert_eq!(text.chars().count(), MAX_RUNTIME_AGENT_TEXT_CHARS);
         assert!(text.ends_with("..."));
+    }
+
+    #[test]
+    fn caps_request_token_usage_keeping_last_n_by_insertion_order() {
+        use crate::session::conversation_model::conversation::SessionTokenUsage;
+
+        let mut conversation = create_session_conversation(None);
+        for i in 0..150 {
+            conversation.request_token_usage.insert(
+                format!("req-{i}"),
+                SessionTokenUsage {
+                    total_tokens: Some(i as u64),
+                    ..Default::default()
+                },
+            );
+        }
+
+        trim_conversation_for_runtime(&mut conversation);
+
+        assert_eq!(
+            conversation.request_token_usage.len(),
+            MAX_RUNTIME_REQUEST_TOKEN_USAGE
+        );
+        // Exactly entries 50..150 (the last 100 inserted), in original
+        // insertion order — matches acpx's `Object.entries(...).slice(-100)`.
+        let expected_keys: Vec<String> = (50..150).map(|i| format!("req-{i}")).collect();
+        let actual_keys: Vec<String> = conversation.request_token_usage.keys().cloned().collect();
+        assert_eq!(actual_keys, expected_keys);
+    }
+
+    #[test]
+    fn trims_oversized_string_tool_result_output_leaves_object_output_untouched() {
+        let mut conversation = create_session_conversation(None);
+        let oversized = "y".repeat(MAX_RUNTIME_TOOL_IO_CHARS + 100);
+        let object_output = serde_json::json!({"path": "a.txt", "unchanged": true});
+
+        let mut agent = SessionAgentMessage::default();
+        agent.tool_results.insert(
+            "string-output".to_string(),
+            SessionToolResult {
+                tool_use_id: "string-output".to_string(),
+                tool_name: "tool_call".to_string(),
+                is_error: false,
+                content: SessionToolResultContent::Text(String::new()),
+                output: Some(Value::String(oversized.clone())),
+            },
+        );
+        agent.tool_results.insert(
+            "object-output".to_string(),
+            SessionToolResult {
+                tool_use_id: "object-output".to_string(),
+                tool_name: "tool_call".to_string(),
+                is_error: false,
+                content: SessionToolResultContent::Text(String::new()),
+                output: Some(object_output.clone()),
+            },
+        );
+        conversation.messages.push(SessionMessage::Agent(agent));
+
+        trim_conversation_for_runtime(&mut conversation);
+
+        let agent = conversation.messages[0].as_agent().unwrap();
+        let string_output = agent.tool_results.get("string-output").unwrap();
+        let Some(Value::String(trimmed)) = &string_output.output else {
+            panic!("expected string output");
+        };
+        assert_eq!(trimmed.chars().count(), MAX_RUNTIME_TOOL_IO_CHARS);
+        assert!(trimmed.ends_with("..."));
+
+        let object_result = agent.tool_results.get("object-output").unwrap();
+        assert_eq!(object_result.output, Some(object_output));
     }
 }
