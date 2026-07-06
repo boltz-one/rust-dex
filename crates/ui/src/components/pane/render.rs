@@ -31,17 +31,23 @@ impl Render for Pane {
             let title = self.tabs[ix].1.title();
             let selected = ix == active_idx;
 
+            // Per-tab hover group: the close button is hidden until the mouse
+            // hovers this specific tab (each tab is its own `group` scope, so
+            // hovering one tab reveals only its own close button).
+            let hover_group = SharedString::from(format!("pane-tab-{}", tab_id.0));
             let close_button = debug_wrap(
                 ("pane-tab-close-wrap", tab_id.0),
                 format!("PANE-TAB-CLOSE-{}", tab_id.0),
                 IconButton::new(("pane-tab-close", tab_id.0), IconName::Close)
                     .icon_size(IconSize::XSmall)
+                    .visible_on_hover(hover_group.clone())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.close_tab(ix, cx);
                     })),
             );
 
             let tab = Tab::new(("pane-tab", tab_id.0))
+                .group(hover_group)
                 .toggle_state(selected)
                 .end_slot(close_button)
                 // Wrap in `Label` so the tab title uses the UI font family/size
