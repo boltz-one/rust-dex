@@ -31,6 +31,7 @@ impl PaneGroup {
         let focus_target = pane.clone();
         let leaf_id = pane.entity_id().as_u64();
 
+        let _ = is_active;
         div()
             .id(("pane-leaf", leaf_id))
             // Test-only (no-op in release builds, per `debug_selector`'s own
@@ -40,12 +41,8 @@ impl PaneGroup {
             .debug_selector(move || format!("PANE-LEAF-{leaf_id}"))
             .size_full()
             .overflow_hidden()
-            .border_2()
-            .border_color(if is_active {
-                semantic::border_focused(cx)
-            } else {
-                gpui::transparent_black()
-            })
+            // No active-pane border: the active tab's accent already indicates
+            // focus, and a border would inset the (otherwise flush) panes.
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, _, window, cx| {
