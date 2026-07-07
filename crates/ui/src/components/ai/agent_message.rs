@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use gpui::{ClickEvent, Entity, SharedString};
+use gpui::{AnyElement, ClickEvent, Entity, SharedString};
 use markdown::Markdown;
 
 use crate::prelude::*;
 use crate::{
-    AgentMarkdown, BadgeColor, BadgeVariant, Card, CardVariant, DiffBlock, Disclosure,
+    AgentMarkdown, BadgeColor, BadgeVariant, Card, CardVariant, CopyButton, DiffBlock, Disclosure,
     Spinner, SpinnerSize, TerminalOutputBlock, ThinkingBlock,
 };
 
@@ -74,6 +74,10 @@ pub struct AgentMessageBubble {
     content: Vec<ToolCallContentDisplay>,
     expanded: bool,
     on_toggle_expanded: Option<Arc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
+    /// Optional trailing action row (e.g. a [`CopyButton`]) rendered for the
+    /// `Assistant` role beneath the body. Caller-owned; `None` (the default)
+    /// renders no actions, so existing call sites are unaffected.
+    actions: Option<AnyElement>,
 }
 
 impl AgentMessageBubble {
@@ -92,6 +96,7 @@ impl AgentMessageBubble {
             content: Vec::new(),
             expanded: false,
             on_toggle_expanded: None,
+            actions: None,
         }
     }
 
@@ -132,6 +137,14 @@ impl AgentMessageBubble {
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_toggle_expanded = Some(Arc::new(handler));
+        self
+    }
+
+    /// Trailing action row for the `Assistant` role, rendered beneath the
+    /// body (e.g. a [`CopyButton`]). Other roles ignore it. Pass an
+    /// `h_flex()` of action buttons to show several; `None` renders nothing.
+    pub fn actions(mut self, actions: impl IntoElement) -> Self {
+        self.actions = Some(actions.into_any_element());
         self
     }
 }
@@ -245,6 +258,18 @@ impl RenderOnce for AgentMessageBubble {
                     .border_color(cx.theme().colors().border_focused)
                     .pl(DynamicSpacing::Base12.px(cx))
                     .child(body)
+                    .when_some(self.actions, |this, actions| {
+                        // Wrap the action row in a group so per-message action
+                        // buttons can opt into `visible_on_hover` against it.
+                        this.group(format!("{}-actions", self.id))
+                            .child(
+                                h_flex()
+                                    .id(format!("{}-actions-row", self.id))
+                                    .mt_1()
+                                    .gap_1()
+                                    .child(actions),
+                            )
+                    })
                     .into_any_element()
             }
             AgentMessageRole::Thinking => {
@@ -344,7 +369,13 @@ impl Component for AgentMessageBubble {
                 .expanded(true);
 
         let assistant = AgentMessageBubble::new("m-a", AgentMessageRole::Assistant, "")
-            .markdown_body(assistant_markdown);
+            .markdown_body(assistant_markdown)
+            .actions(
+                h_flex().child(
+                    CopyButton::new("m-a-copy", "Run `cargo test -p boltz-ui`.")
+                        .visible_on_hover("m-a-actions"),
+                ),
+            );
 
         let thinking =
             AgentMessageBubble::new("m-thinking", AgentMessageRole::Thinking, "Checking...")
