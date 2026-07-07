@@ -312,3 +312,106 @@ impl AssetSource for Assets {
             .collect())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every `IconName` variant referenced in `base/crates/ui/src` or `terminal/src`
+    /// must resolve to an embedded SVG asset. This is the live call-site set (76
+    /// variants), not the full enum — unreferenced variants are a known gap (YAGNI).
+    /// `KnockoutIconName` (DotBg/DotFg/TriangleBg/TriangleFg/XBg/XFg) is a separate
+    /// enum resolving to `icons/knockouts/*.svg`, not listed here.
+    /// Add new variants here only when they start being referenced in ui/terminal.
+    const REFERENCED: &[IconName] = &[
+        IconName::AcpRegistry,
+        IconName::AiClaude,
+        IconName::AiEdit,
+        IconName::AiOpenAi,
+        IconName::AiOpenCode,
+        IconName::Archive,
+        IconName::ArrowCircle,
+        IconName::ArrowDown,
+        IconName::ArrowLeft,
+        IconName::ArrowRight,
+        IconName::ArrowUp,
+        IconName::ArrowUpRight,
+        IconName::AtSign,
+        IconName::AudioOff,
+        IconName::Backspace,
+        IconName::Bell,
+        IconName::Blocks,
+        IconName::BoltFilled,
+        IconName::Box,
+        IconName::Check,
+        IconName::CheckCircle,
+        IconName::ChevronDown,
+        IconName::ChevronLeft,
+        IconName::ChevronRight,
+        IconName::ChevronUp,
+        IconName::ChevronUpDown,
+        IconName::Circle,
+        IconName::Clock,
+        IconName::Close,
+        IconName::Command,
+        IconName::Control,
+        IconName::Copy,
+        IconName::CountdownTimer,
+        IconName::Dash,
+        IconName::Download,
+        IconName::Ellipsis,
+        IconName::Escape,
+        IconName::ExclamationTriangle,
+        IconName::File,
+        IconName::FileDoc,
+        IconName::FileRust,
+        IconName::Folder,
+        IconName::FolderOpen,
+        IconName::GitBranch,
+        IconName::GitWorktree,
+        IconName::Info,
+        IconName::ListTree,
+        IconName::LoadCircle,
+        IconName::MagnifyingGlass,
+        IconName::MicMute,
+        IconName::Option,
+        IconName::PageDown,
+        IconName::PageUp,
+        IconName::Paperclip,
+        IconName::Person,
+        IconName::PlayFilled,
+        IconName::Plus,
+        IconName::Return,
+        IconName::RotateCw,
+        IconName::Settings,
+        IconName::Shift,
+        IconName::Space,
+        IconName::Sparkle,
+        IconName::Split,
+        IconName::Star,
+        IconName::Tab,
+        IconName::ToolHammer,
+        IconName::ToolTerminal,
+        IconName::ToolThink,
+        IconName::Trash,
+        IconName::Triangle,
+        IconName::Undo,
+        IconName::User,
+        IconName::Warning,
+        IconName::XCircle,
+        IconName::XMark,
+    ];
+
+    #[test]
+    fn referenced_icons_have_assets() {
+        for icon in REFERENCED {
+            let path = icon.path();
+            assert!(
+                Assets::get(&path).is_some(),
+                "IconName::{:?} -> {} has no embedded SVG asset",
+                icon,
+                path
+            );
+        }
+    }
+}

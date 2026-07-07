@@ -183,7 +183,7 @@ impl MarkdownStyle {
         };
 
         let mut text_style = window.text_style();
-        let line_height = buffer_font_size * 1.75;
+        let line_height = buffer_font_size * 1.5;
 
         text_style.refine(&TextStyleRefinement {
             font_family: Some(body_font_family),
@@ -272,26 +272,32 @@ impl MarkdownStyle {
                 HeadingLevelStyles {
                     h1: Some(TextStyleRefinement {
                         font_size: Some(rems(1.15).into()),
+                        font_weight: Some(FontWeight::SEMIBOLD),
                         ..Default::default()
                     }),
                     h2: Some(TextStyleRefinement {
                         font_size: Some(rems(1.1).into()),
+                        font_weight: Some(FontWeight::SEMIBOLD),
                         ..Default::default()
                     }),
                     h3: Some(TextStyleRefinement {
                         font_size: Some(rems(1.05).into()),
+                        font_weight: Some(FontWeight::SEMIBOLD),
                         ..Default::default()
                     }),
                     h4: Some(TextStyleRefinement {
                         font_size: Some(rems(1.).into()),
+                        font_weight: Some(FontWeight::MEDIUM),
                         ..Default::default()
                     }),
                     h5: Some(TextStyleRefinement {
                         font_size: Some(rems(0.95).into()),
+                        font_weight: Some(FontWeight::MEDIUM),
                         ..Default::default()
                     }),
                     h6: Some(TextStyleRefinement {
                         font_size: Some(rems(0.875).into()),
+                        font_weight: Some(FontWeight::MEDIUM),
                         ..Default::default()
                     }),
                 },
