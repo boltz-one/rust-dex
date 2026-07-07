@@ -163,7 +163,7 @@ impl RenderOnce for Divider {
                 return h_flex()
                     .w_full()
                     .items_center()
-                    .gap_2()
+                    .gap(DynamicSpacing::Base08.rems(cx))
                     .child(div().h_px().flex_1().bg(line_color))
                     .child(
                         Label::new(label)
@@ -180,12 +180,12 @@ impl RenderOnce for Divider {
                 .min_w_0()
                 .h_px()
                 .w_full()
-                .when(self.inset, |this| this.mx_1p5()),
+                .when(self.inset, |this| this.mx(DynamicSpacing::Base06.px(cx))),
             DividerDirection::Vertical => div()
                 .min_w_0()
                 .w_px()
                 .h_full()
-                .when(self.inset, |this| this.my_1p5()),
+                .when(self.inset, |this| this.my(DynamicSpacing::Base06.px(cx))),
         };
 
         match self.style {
@@ -206,10 +206,10 @@ impl Component for Divider {
         )
     }
 
-    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
+    fn preview(_window: &mut Window, cx: &mut App) -> Option<AnyElement> {
         Some(
             v_flex()
-                .gap_6()
+                .gap(DynamicSpacing::Base24.rems(cx))
                 .children(vec![
                     example_group_with_title(
                         "Horizontal Dividers",
@@ -271,8 +271,8 @@ impl Component for Divider {
                             "Between Content",
                             v_flex()
                                 .w_full()
-                                .gap_4()
-                                .px_4()
+                                .gap(DynamicSpacing::Base16.rems(cx))
+                                .px(DynamicSpacing::Base16.px(cx))
                                 .child(Label::new("Section One"))
                                 .child(Divider::horizontal())
                                 .child(Label::new("Section Two"))

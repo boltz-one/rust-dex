@@ -79,19 +79,24 @@ impl RenderOnce for Card {
         base.when_some(self.header, |this, header| {
             this.child(
                 div()
-                    .px_6()
-                    .py_4()
+                    .px(DynamicSpacing::Base24.px(cx))
+                    .py(DynamicSpacing::Base16.px(cx))
                     .border_b_1()
                     .border_color(semantic::border(cx))
                     .child(header),
             )
         })
-        .child(v_flex().p_6().gap_4().children(self.children))
+        .child(
+            v_flex()
+                .p(DynamicSpacing::Base24.px(cx))
+                .gap(DynamicSpacing::Base16.rems(cx))
+                .children(self.children),
+        )
         .when_some(self.footer, |this, footer| {
             this.child(
                 div()
-                    .px_6()
-                    .py_4()
+                    .px(DynamicSpacing::Base24.px(cx))
+                    .py(DynamicSpacing::Base16.px(cx))
                     .border_t_1()
                     .border_color(semantic::border(cx))
                     .child(footer),
@@ -109,10 +114,10 @@ impl Component for Card {
         Some("A surface container for grouping content, with optional header and footer.")
     }
 
-    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
+    fn preview(_window: &mut Window, cx: &mut App) -> Option<AnyElement> {
         Some(
             h_flex()
-                .gap_4()
+                .gap(DynamicSpacing::Base16.rems(cx))
                 .child(
                     Card::new()
                         .header(Label::new("Bordered"))

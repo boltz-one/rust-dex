@@ -272,7 +272,7 @@ impl Component for DropdownMenu {
 
         Some(
             v_flex()
-                .gap_6()
+                .gap(DynamicSpacing::Base24.rems(cx))
                 .children(vec![
                     example_group_with_title(
                         "Basic Usage",

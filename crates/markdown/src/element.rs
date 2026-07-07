@@ -1119,9 +1119,17 @@ impl gpui::Element for MarkdownElement {
                                         checkbox.into_any_element()
                                     }
                                 } else if let Some(bullet_index) = builder.next_bullet_index() {
-                                    div().child(format!("{}.", bullet_index)).into_any_element()
+                                    div()
+                                        .min_w(px(16.))
+                                        .text_color(cx.theme().colors().text)
+                                        .child(format!("{}.", bullet_index))
+                                        .into_any_element()
                                 } else {
-                                    div().child("•").into_any_element()
+                                    div()
+                                        .min_w(px(16.))
+                                        .text_color(cx.theme().colors().text)
+                                        .child("•")
+                                        .into_any_element()
                                 };
                             self.push_markdown_list_item(&mut builder, bullet, range, markdown_end);
                         }

@@ -6,12 +6,14 @@ use markdown::Markdown;
 use crate::prelude::*;
 use crate::{
     AgentMarkdown, BadgeColor, BadgeVariant, Card, CardVariant, DiffBlock, Disclosure,
-    TerminalOutputBlock, ThinkingBlock,
+    Spinner, SpinnerSize, TerminalOutputBlock, ThinkingBlock,
 };
 
 /// Who/what produced a message: `User`/`Status` render as plain text,
 /// `Assistant` through [`AgentMarkdown`], `Thinking` through
-/// [`ThinkingBlock`], `ToolCall` as a collapsible card.
+/// [`ThinkingBlock`], `ToolCall` as a collapsible card, `Streaming` as a
+/// spinner + "Assistant is responding…" row shown while an assistant turn
+/// is in progress.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AgentMessageRole {
     User,
@@ -20,6 +22,7 @@ pub enum AgentMessageRole {
     ToolCall,
     Status,
     Thinking,
+    Streaming,
 }
 
 /// Lifecycle state of a `ToolCall` message, driving its status badge.
@@ -238,6 +241,9 @@ impl RenderOnce for AgentMessageBubble {
                 div()
                     .id(self.id.clone())
                     .w_full()
+                    .border_l_2()
+                    .border_color(cx.theme().colors().border_focused)
+                    .pl(DynamicSpacing::Base12.px(cx))
                     .child(body)
                     .into_any_element()
             }
@@ -280,6 +286,28 @@ impl RenderOnce for AgentMessageBubble {
                         .color(Color::Muted),
                 )
                 .into_any_element(),
+            AgentMessageRole::Streaming => {
+                let label: SharedString = if self.body.is_empty() {
+                    "Assistant is responding…".into()
+                } else {
+                    self.body
+                };
+                h_flex()
+                    .id(self.id)
+                    .w_full()
+                    .gap(DynamicSpacing::Base02.rems(cx))
+                    .child(
+                        Spinner::new()
+                            .id("streaming-spinner")
+                            .size(SpinnerSize::Sm),
+                    )
+                    .child(
+                        Label::new(label)
+                            .size(LabelSize::Small)
+                            .color(Color::Muted),
+                    )
+                    .into_any_element()
+            }
             AgentMessageRole::ToolCall => tool_call_card(self, cx),
         }
     }
@@ -336,6 +364,11 @@ impl Component for AgentMessageBubble {
                 "m-status",
                 AgentMessageRole::Status,
                 "Connecting…",
+            ))
+            .child(AgentMessageBubble::new(
+                "m-streaming",
+                AgentMessageRole::Streaming,
+                "",
             ));
 
         Some(

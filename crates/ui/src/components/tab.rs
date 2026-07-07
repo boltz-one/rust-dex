@@ -203,14 +203,14 @@ impl RenderOnce for Tab {
                 let content = h_flex()
                     .w_full()
                     .items_center()
-                    .gap_2()
+                    .gap(DynamicSpacing::Base08.rems(cx))
                     .children(self.start_slot)
                     .child(
                         h_flex()
                             .flex_1()
                             .min_w_0()
                             .items_center()
-                            .gap_2()
+                            .gap(DynamicSpacing::Base08.rems(cx))
                             .children(self.children),
                     )
                     .children(self.end_slot);
@@ -224,8 +224,8 @@ impl RenderOnce for Tab {
 
                 self.div
                     .cursor_pointer()
-                    .px_3()
-                    .py_1p5()
+                    .px(DynamicSpacing::Base12.px(cx))
+                    .py(DynamicSpacing::Base06.px(cx))
                     .rounded_md()
                     .bg(bg)
                     .text_color(text_color)
@@ -250,10 +250,10 @@ impl Component for Tab {
         )
     }
 
-    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
+    fn preview(_window: &mut Window, cx: &mut App) -> Option<AnyElement> {
         Some(
             v_flex()
-                .gap_6()
+                .gap(DynamicSpacing::Base24.rems(cx))
                 .children(vec![
                     example_group_with_title(
                         "Underline",

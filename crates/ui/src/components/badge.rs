@@ -77,9 +77,9 @@ impl RenderOnce for Badge {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let mut base = h_flex()
             .items_center()
-            .gap_1()
-            .px_2()
-            .py_0p5()
+            .gap(DynamicSpacing::Base04.rems(cx))
+            .px(DynamicSpacing::Base08.px(cx))
+            .py(DynamicSpacing::Base02.px(cx))
             .rounded_full();
 
         // shadcn's `secondary` badge is a distinct neutral-solid role
@@ -125,7 +125,12 @@ impl RenderOnce for Badge {
         };
 
         base.when(self.dot, |this| {
-            this.child(div().size_1p5().rounded_full().bg(dot_color))
+            this.child(
+                div()
+                    .size(DynamicSpacing::Base06.px(cx))
+                    .rounded_full()
+                    .bg(dot_color),
+            )
         })
         .child(
             Label::new(self.label)
@@ -145,7 +150,7 @@ impl Component for Badge {
         Some("A small pill label conveying status or category.")
     }
 
-    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
+    fn preview(_window: &mut Window, cx: &mut App) -> Option<AnyElement> {
         let colors = [
             ("Neutral", BadgeColor::Neutral),
             ("Secondary", BadgeColor::Secondary),
@@ -155,7 +160,7 @@ impl Component for Badge {
             ("Danger", BadgeColor::Danger),
         ];
         let row = |variant: BadgeVariant, dot: bool| {
-            let mut r = h_flex().gap_2();
+            let mut r = h_flex().gap(DynamicSpacing::Base08.rems(cx));
             for (name, color) in colors {
                 r = r.child(Badge::new(name).variant(variant).color(color).dot(dot));
             }
@@ -163,7 +168,7 @@ impl Component for Badge {
         };
         let status_row = || {
             h_flex()
-                .gap_2()
+                .gap(DynamicSpacing::Base08.rems(cx))
                 .child(
                     Badge::new("Active")
                         .variant(BadgeVariant::Soft)
@@ -190,7 +195,7 @@ impl Component for Badge {
 
         Some(
             v_flex()
-                .gap_3()
+                .gap(DynamicSpacing::Base12.rems(cx))
                 .child(row(BadgeVariant::Soft, true))
                 .child(row(BadgeVariant::Solid, true))
                 .child(row(BadgeVariant::Outline, true))
