@@ -11,7 +11,9 @@
 #   NO_VERIFY=0 CARGO_REGISTRY_TOKEN=... ./scripts/publish-crates.sh # publish with per-crate build verify
 #
 # Environment:
-#   CARGO_REGISTRY_TOKEN  crates.io API token (required for real publish; passed to `cargo publish`)
+#   CARGO_REGISTRY_TOKEN  crates.io API token. If unset, read from
+#                         ~/.cargo/credentials.toml ([registry.crates-io] or [registry]).
+#                         Required for real publish (passed to `cargo publish`).
 #   DRY_RUN               "1" -> package + local checks only, never uploads (default "0")
 #   NO_VERIFY             "1" -> pass --no-verify to cargo publish (default "1"; workspace is built separately)
 #   ALLOW_DIRTY           "1" -> pass --allow-dirty (for local runs with uncommitted changes; default "0")
@@ -73,6 +75,34 @@ PACKAGES=(
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
+
+# Resolve the crates.io token: prefer $CARGO_REGISTRY_TOKEN (CI), else read it
+# from ~/.cargo/credentials.toml. Echoes the token to stdout; empty on failure.
+resolve_token() {
+  if [ -n "${CARGO_REGISTRY_TOKEN:-}" ]; then
+    printf '%s' "$CARGO_REGISTRY_TOKEN"
+    return 0
+  fi
+  local creds="${CARGO_HOME:-$HOME}/.cargo/credentials.toml"
+  [ -f "$creds" ] || return 0
+  python3 - "$creds" <<'PY'
+import sys, re
+path = sys.argv[1]
+try:
+    txt = open(path, encoding="utf-8").read()
+except Exception:
+    sys.exit(0)
+# Extract the token under [registry.crates-io] (preferred) or [registry].
+def grab(section):
+    m = re.search(r"\[" + re.escape(section) + r"\](.*?)(?=^\[|\Z)", txt, re.S | re.M)
+    if not m:
+        return None
+    body = m.group(1)
+    t = re.search(r'^\s*token\s*=\s*"([^"]+)"', body, re.M)
+    return t.group(1) if t else None
+print(grab("registry.crates-io") or grab("registry") or "", end="")
+PY
+}
 
 # Resolve the version of a workspace package from cargo metadata.
 pkg_version() {
@@ -154,8 +184,11 @@ publish_one() {
 }
 
 main() {
-  if [ "$DRY_RUN" != "1" ] && [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
-    die "CARGO_REGISTRY_TOKEN is required for a real publish (set DRY_RUN=1 to validate only)"
+  local token=""
+  if [ "$DRY_RUN" != "1" ]; then
+    token="$(resolve_token)"
+    [ -n "$token" ] || die "no crates.io token found: set CARGO_REGISTRY_TOKEN or put one in ~/.cargo/credentials.toml (set DRY_RUN=1 to validate only)"
+    export CARGO_REGISTRY_TOKEN="$token"
   fi
 
   log "mode: $([ "$DRY_RUN" = 1 ] && echo DRY-RUN || echo PUBLISH) | no-verify=$NO_VERIFY | ${#PACKAGES[@]} crates"
