@@ -1,10 +1,22 @@
+mod agent_chat_input;
+mod agent_markdown;
+mod agent_message;
+mod agent_model_selector;
 mod agent_setup_button;
+mod agent_thread_toolbar;
+mod agent_thread_view;
 mod ai_setting_item;
 mod configured_api_card;
 mod parallel_agents_illustration;
 mod thread_item;
 
+pub use agent_chat_input::*;
+pub use agent_markdown::*;
+pub use agent_message::*;
+pub use agent_model_selector::*;
 pub use agent_setup_button::*;
+pub use agent_thread_toolbar::*;
+pub use agent_thread_view::*;
 pub use ai_setting_item::*;
 pub use configured_api_card::*;
 pub use parallel_agents_illustration::*;
