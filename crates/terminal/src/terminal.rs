@@ -414,6 +414,9 @@ pub struct Terminal {
     /// threads (only its internal `Arc<FairMutex<_>>` grid state is,
     /// with the background I/O thread).
     current_size: StdCell<TerminalSize>,
+    /// PID of the spawned shell process (Unix only; None on other platforms).
+    /// Used by callers to look up the shell's live working directory.
+    shell_pid: Option<u32>,
 }
 
 impl Terminal {
@@ -440,6 +443,11 @@ impl Terminal {
 
         let pty = tty::new(&pty_options, size.window_size(), 0)?;
 
+        #[cfg(unix)]
+        let shell_pid = Some(pty.child().id());
+        #[cfg(not(unix))]
+        let shell_pid = None;
+
         let config = Config::default();
         let term = Arc::new(FairMutex::new(Term::new(
             config,
@@ -459,6 +467,7 @@ impl Terminal {
                 term,
                 notifier,
                 current_size: StdCell::new(size),
+                shell_pid,
             },
             rx,
         ))
@@ -467,6 +476,13 @@ impl Terminal {
     /// The size last passed to `spawn`/`spawn_with_shell`/`resize`.
     pub fn current_size(&self) -> TerminalSize {
         self.current_size.get()
+    }
+
+    /// PID of the spawned shell process (Unix only; `None` elsewhere). A caller
+    /// can read this process's current working directory (e.g. via `sysinfo`)
+    /// to follow `cd` inside the terminal.
+    pub fn shell_pid(&self) -> Option<u32> {
+        self.shell_pid
     }
 
     /// Writes raw bytes to the PTY as if the user typed them (already
@@ -840,6 +856,24 @@ mod tests {
             found,
             "expected echoed marker in PTY output, got: {:?}",
             terminal.screen_lines()
+        );
+    }
+
+    /// Spawns a real shell and asserts that `shell_pid()` returns a valid
+    /// process id (Some with pid > 0).
+    #[test]
+    fn shell_pid_is_some_after_spawn() {
+        let shell = tty::Shell::new("/bin/sh".to_string(), Vec::new());
+        let (terminal, _events) =
+            Terminal::spawn_with_shell(shell, small_size()).expect("failed to spawn PTY shell");
+
+        let pid = terminal.shell_pid();
+        terminal.shutdown();
+
+        assert!(
+            pid.is_some() && pid.unwrap() > 0,
+            "expected shell_pid() to return Some(pid) with pid > 0, got: {:?}",
+            pid
         );
     }
 
