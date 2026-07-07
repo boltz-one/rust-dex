@@ -58,6 +58,9 @@ pub struct AgentChatInput {
     /// `Combobox::trigger_bounds` for the full rationale).
     input_bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
     on_submit: Option<Rc<dyn Fn(SharedString, &mut Window, &mut App) + 'static>>,
+    /// Focus the text field on the next render (once), so opening the input
+    /// leaves the caret ready to type without a click first.
+    focus_pending: bool,
 }
 
 impl AgentChatInput {
@@ -77,6 +80,7 @@ impl AgentChatInput {
             completion_selected_ix: 0,
             input_bounds: Rc::new(Cell::new(None)),
             on_submit: None,
+            focus_pending: true,
         }
     }
 
@@ -187,7 +191,12 @@ impl AgentChatInput {
 }
 
 impl Render for AgentChatInput {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.focus_pending {
+            self.focus_pending = false;
+            let focus_handle = self.input.read(cx).focus_handle(cx);
+            window.focus(&focus_handle, cx);
+        }
         let text = self.input.read(cx).text().to_string();
         let query = detect_command_query(&text).map(str::to_string);
         let disabled = self.sending || text.trim().is_empty();

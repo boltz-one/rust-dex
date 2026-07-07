@@ -266,9 +266,13 @@ features = [
 
 
 [profile.dev]
+debug = 0
 split-debuginfo = "unpacked"
 incremental = true
 codegen-units = 16
+
+[profile.dev.package."*"]
+debug = false
 
 # mirror configuration for crates compiled for the build platform
 # (without this cargo will compile ~400 crates twice)
