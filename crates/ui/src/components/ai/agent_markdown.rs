@@ -40,10 +40,6 @@ impl RenderOnce for AgentMarkdown {
     }
 }
 
-// ---------------------------------------------------------------------
-// Block-level parsing
-// ---------------------------------------------------------------------
-
 #[derive(Debug, Clone, PartialEq)]
 enum Block {
     Heading { level: u8, text: String },
@@ -169,10 +165,6 @@ fn parse_blocks(input: &str) -> Vec<Block> {
     blocks
 }
 
-// ---------------------------------------------------------------------
-// Inline-level parsing
-// ---------------------------------------------------------------------
-
 #[derive(Debug, Clone, PartialEq)]
 enum InlineStyle {
     Bold,
@@ -282,10 +274,6 @@ fn render_inline_text(text: &str, cx: &App) -> StyledText {
         .with_highlights(highlights)
         .with_font_family_overrides(font_overrides)
 }
-
-// ---------------------------------------------------------------------
-// Rendering
-// ---------------------------------------------------------------------
 
 /// Maps a fenced code block's language tag to a `CodeEditor` extension.
 /// Unrecognized/absent tags fall back to plain (unhighlighted) rendering.

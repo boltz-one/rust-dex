@@ -652,6 +652,20 @@ impl TextLayout {
         None
     }
 
+    /// The per-(wrapped-)line layouts for the whole text, in order. Used by
+    /// consumers that map source ranges to on-screen segments across lines
+    /// (e.g. selection / search-highlight bounds computation).
+    pub fn line_layouts(&self) -> SmallVec<[Arc<WrappedLineLayout>; 1]> {
+        self.0
+            .borrow()
+            .as_ref()
+            .expect("measurement has not been performed")
+            .lines
+            .iter()
+            .map(|line| line.layout.clone())
+            .collect()
+    }
+
     /// The bounds of this layout.
     pub fn bounds(&self) -> Bounds<Pixels> {
         self.0.borrow().as_ref().unwrap().bounds.unwrap()
