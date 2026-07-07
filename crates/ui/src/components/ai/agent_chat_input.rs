@@ -2,7 +2,8 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui::{
-    Bounds, Context, Entity, Focusable, KeyDownEvent, Pixels, Render, SharedString, canvas,
+    Bounds, Context, Entity, Focusable, KeyDownEvent, MouseButton, Pixels, Render, SharedString,
+    canvas,
 };
 
 use crate::components::ai::completion_popover::{
@@ -209,12 +210,19 @@ impl Render for AgentChatInput {
             }));
 
         let input_bounds = self.input_bounds.clone();
+        let focus_handle = self.input.read(cx).focus_handle(cx);
         let field = div()
             .id("agent-chat-input-field")
             .relative()
             .w_full()
             .min_h(px(64.))
             .on_key_down(cx.listener(Self::handle_key_down))
+            .on_mouse_down(MouseButton::Left, {
+                let focus_handle = focus_handle.clone();
+                move |_event, window, cx| {
+                    window.focus(&focus_handle, cx);
+                }
+            })
             .child(self.input.clone())
             .child(
                 canvas(
