@@ -1179,7 +1179,7 @@ version = "0.1.0"
 
 [[package]]
 name = "boltz-ui"
-version = "0.2.11"
+version = "0.2.12"
 dependencies = [
  "boltz-component",
  "boltz-gpui",
@@ -1187,6 +1187,7 @@ dependencies = [
  "boltz-gpui-util",
  "boltz-icons",
  "boltz-language",
+ "boltz-markdown",
  "boltz-menu",
  "boltz-syntax-theme",
  "boltz-terminal",

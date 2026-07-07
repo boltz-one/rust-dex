@@ -1,4 +1,6 @@
-use gpui::{Context, FocusHandle, Focusable, KeyDownEvent, MouseButton, Render};
+use std::rc::Rc;
+
+use gpui::{AnyElement, Context, FocusHandle, Focusable, KeyDownEvent, MouseButton, Render};
 
 use crate::prelude::*;
 
@@ -24,8 +26,10 @@ pub struct TextInput {
     placeholder: SharedString,
     focus_handle: FocusHandle,
     multiline: bool,
+    submit_on_enter: bool,
     validation: InputValidationState,
     read_only: bool,
+    on_submit: Option<Rc<dyn Fn(&mut Window, &mut Context<Self>) + 'static>>,
 }
 
 impl TextInput {
@@ -35,8 +39,10 @@ impl TextInput {
             placeholder: SharedString::default(),
             focus_handle: cx.focus_handle(),
             multiline: false,
+            submit_on_enter: false,
             validation: InputValidationState::Neutral,
             read_only: false,
+            on_submit: None,
         }
     }
 
@@ -47,6 +53,26 @@ impl TextInput {
 
     pub fn multiline(mut self, multiline: bool) -> Self {
         self.multiline = multiline;
+        self
+    }
+
+    /// When `true`, plain Enter fires [`Self::on_submit`] instead of
+    /// inserting a newline; Shift/Ctrl/Cmd+Enter still inserts a newline (in
+    /// `multiline` mode). Defaults to `false`, which preserves the previous
+    /// behavior of always inserting a newline on Enter in `multiline` mode
+    /// (e.g. `CodeEditor`'s free-form multiline input).
+    pub fn submit_on_enter(mut self, submit_on_enter: bool) -> Self {
+        self.submit_on_enter = submit_on_enter;
+        self
+    }
+
+    /// Registers a callback fired when the user presses plain Enter while
+    /// [`Self::submit_on_enter`] is `true`. Has no effect otherwise.
+    pub fn on_submit(
+        mut self,
+        handler: impl Fn(&mut Window, &mut Context<Self>) + 'static,
+    ) -> Self {
+        self.on_submit = Some(Rc::new(handler));
         self
     }
 
@@ -117,11 +143,26 @@ impl TextInput {
         cx.notify();
     }
 
-    fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn on_key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.read_only {
             return;
         }
         let keystroke = &event.keystroke;
+
+        if self.submit_on_enter && keystroke.key == "enter" {
+            let wants_newline = self.multiline
+                && (keystroke.modifiers.shift
+                    || keystroke.modifiers.control
+                    || keystroke.modifiers.platform);
+            if wants_newline {
+                self.content.push('\n');
+            } else if let Some(on_submit) = self.on_submit.clone() {
+                on_submit(window, cx);
+            }
+            cx.notify();
+            return;
+        }
+
         // Ignore keyboard shortcuts (cmd/ctrl chords) — only capture text input.
         if keystroke.modifiers.control || keystroke.modifiers.platform {
             return;
@@ -146,11 +187,6 @@ impl Render for TextInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.focus_handle.is_focused(window);
         let is_empty = self.content.is_empty();
-        let display: SharedString = if is_empty {
-            self.placeholder.clone()
-        } else {
-            self.content.clone().into()
-        };
         let text_color = if is_empty {
             semantic::text_placeholder(cx)
         } else {
@@ -168,6 +204,46 @@ impl Render for TextInput {
             InputValidationState::Warning => palette::warning(500),
             InputValidationState::Neutral => palette::primary(500),
         };
+        let show_cursor = focused && !is_empty && !self.read_only;
+        let cursor = || div().w(px(1.)).h(px(16.)).bg(palette::primary(500));
+
+        // Multiline content is split and rendered one row per line (rather
+        // than a single text child carrying embedded `\n`s) so each typed
+        // newline reliably produces a new visual row, with the blinking
+        // caret appended to the last row.
+        let content: AnyElement = if self.multiline {
+            let text: SharedString = if is_empty {
+                self.placeholder.clone()
+            } else {
+                self.content.clone().into()
+            };
+            let lines: Vec<String> = text.split('\n').map(str::to_string).collect();
+            let last_ix = lines.len().saturating_sub(1);
+            v_flex()
+                .w_full()
+                .children(lines.into_iter().enumerate().map(|(ix, line)| {
+                    h_flex()
+                        .min_h(px(20.))
+                        .items_center()
+                        .gap_0p5()
+                        .child(SharedString::from(line))
+                        .when(ix == last_ix && show_cursor, |this| this.child(cursor()))
+                }))
+                .into_any_element()
+        } else {
+            let display: SharedString = if is_empty {
+                self.placeholder.clone()
+            } else {
+                self.content.clone().into()
+            };
+            h_flex()
+                .flex_wrap()
+                .items_center()
+                .gap_0p5()
+                .child(display)
+                .when(show_cursor, |this| this.child(cursor()))
+                .into_any_element()
+        };
 
         let field = div()
             .track_focus(&self.focus_handle)
@@ -181,10 +257,6 @@ impl Render for TextInput {
             )
             .w_full()
             .when(self.multiline, |this| this.min_h(px(96.)))
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .gap_0p5()
             .px_3()
             .py_2()
             .rounded_md()
@@ -192,10 +264,7 @@ impl Render for TextInput {
             .border_1()
             .border_color(border_color)
             .text_color(text_color)
-            .child(display)
-            .when(focused && !is_empty && !self.read_only, |this| {
-                this.child(div().w(px(1.)).h(px(16.)).bg(palette::primary(500)))
-            });
+            .child(content);
 
         focus_ring(field, focused, ring_color)
     }

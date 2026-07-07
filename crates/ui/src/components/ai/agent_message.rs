@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
-use gpui::{ClickEvent, SharedString};
+use gpui::{ClickEvent, Entity, SharedString};
+use markdown::Markdown;
 
 use crate::prelude::*;
-use crate::{AgentMarkdown, BadgeColor, BadgeVariant, Card, CardVariant, Disclosure};
+use crate::{
+    AgentMarkdown, BadgeColor, BadgeVariant, Card, CardVariant, DiffBlock, Disclosure,
+    TerminalOutputBlock, ThinkingBlock,
+};
 
 /// Who/what produced a message: `User`/`Status` render as plain text,
-/// `Assistant`/`Thinking` through [`AgentMarkdown`], `ToolCall` as a card.
+/// `Assistant` through [`AgentMarkdown`], `Thinking` through
+/// [`ThinkingBlock`], `ToolCall` as a collapsible card.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AgentMessageRole {
     User,
@@ -26,16 +31,44 @@ pub enum ToolCallState {
     Failed,
 }
 
+/// One entry of a tool call's collapsible body. Boltz-ui-local mirror of the
+/// terminal crate's tool-call content shapes — intentionally has no
+/// dependency on any acpx/schema type.
+#[derive(Clone)]
+pub enum ToolCallContentDisplay {
+    /// Markdown text content, e.g. an explanation or a file excerpt.
+    Text(Entity<Markdown>),
+    /// A unified old/new diff, rendered via [`DiffBlock`] (Decision #2a: no
+    /// buffer-aware inline-editable diff view).
+    Diff {
+        old_text: SharedString,
+        new_text: SharedString,
+        /// File extension (no leading dot, e.g. `"rs"`) for syntax
+        /// highlighting; `None` renders as plain text.
+        language: Option<SharedString>,
+    },
+    /// Captured terminal output, rendered via [`TerminalOutputBlock`]
+    /// (Decision #2b: static text, no PTY grid).
+    Terminal {
+        command: Option<SharedString>,
+        raw_output: SharedString,
+    },
+}
+
 /// A single chat message. Pure builder — all state is caller-owned.
 #[derive(IntoElement, RegisterComponent)]
 pub struct AgentMessageBubble {
     id: ElementId,
     role: AgentMessageRole,
     body: SharedString,
+    /// Rendered body for `Assistant`/`Thinking` roles. Falls back to a plain
+    /// `body` label when unset (e.g. a caller not yet passing a persistent
+    /// `Entity<Markdown>` — see [`AgentMarkdown`]'s docs for why one is
+    /// needed for markdown to actually render).
+    markdown_body: Option<Entity<Markdown>>,
     tool_name: Option<SharedString>,
     tool_state: ToolCallState,
-    tool_input: Option<SharedString>,
-    tool_output: Option<SharedString>,
+    content: Vec<ToolCallContentDisplay>,
     expanded: bool,
     on_toggle_expanded: Option<Arc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
 }
@@ -50,13 +83,21 @@ impl AgentMessageBubble {
             id: id.into(),
             role,
             body: body.into(),
+            markdown_body: None,
             tool_name: None,
             tool_state: ToolCallState::default(),
-            tool_input: None,
-            tool_output: None,
+            content: Vec::new(),
             expanded: false,
             on_toggle_expanded: None,
         }
+    }
+
+    /// Sets the rendered markdown body for `Assistant`/`Thinking` roles. See
+    /// [`AgentMarkdown`]'s docs on why this takes a persistent `Entity`
+    /// rather than raw text.
+    pub fn markdown_body(mut self, markdown: Entity<Markdown>) -> Self {
+        self.markdown_body = Some(markdown);
+        self
     }
 
     /// `ToolCall` header title; falls back to `body` when unset.
@@ -69,17 +110,15 @@ impl AgentMessageBubble {
         self.tool_state = state;
         self
     }
-    pub fn tool_input(mut self, input: impl Into<SharedString>) -> Self {
-        self.tool_input = Some(input.into());
+
+    /// The tool call's collapsible body content (text/diff/terminal entries,
+    /// rendered in order).
+    pub fn content(mut self, content: Vec<ToolCallContentDisplay>) -> Self {
+        self.content = content;
         self
     }
 
-    pub fn tool_output(mut self, output: impl Into<SharedString>) -> Self {
-        self.tool_output = Some(output.into());
-        self
-    }
-
-    /// Whether the raw input/output section is expanded (caller-owned).
+    /// Whether the tool-call body is expanded (caller-owned).
     pub fn expanded(mut self, expanded: bool) -> Self {
         self.expanded = expanded;
         self
@@ -94,21 +133,44 @@ impl AgentMessageBubble {
     }
 }
 
-fn raw_block(label: &'static str, content: SharedString, cx: &App) -> AnyElement {
+fn render_tool_call_content(
+    bubble_id: &ElementId,
+    content: Vec<ToolCallContentDisplay>,
+) -> impl IntoElement {
     v_flex()
-        .gap_1()
-        .child(Label::new(label).size(LabelSize::Small).color(Color::Muted))
-        .child(
-            div()
-                .p_2()
-                .rounded_md()
-                .bg(cx.theme().colors().element_background)
-                .child(content),
-        )
-        .into_any_element()
+        .gap_2()
+        .children(content.into_iter().enumerate().map(|(index, entry)| {
+            let item_id = format!("{bubble_id}-content-{index}");
+            match entry {
+                ToolCallContentDisplay::Text(markdown) => {
+                    AgentMarkdown::new(item_id, markdown).into_any_element()
+                }
+                ToolCallContentDisplay::Diff {
+                    old_text,
+                    new_text,
+                    language,
+                } => {
+                    let diff = DiffBlock::new(item_id, old_text, new_text);
+                    match language {
+                        Some(language) => diff.language(language).into_any_element(),
+                        None => diff.into_any_element(),
+                    }
+                }
+                ToolCallContentDisplay::Terminal {
+                    command,
+                    raw_output,
+                } => {
+                    let terminal = TerminalOutputBlock::new(item_id, raw_output);
+                    match command {
+                        Some(command) => terminal.command(command).into_any_element(),
+                        None => terminal.into_any_element(),
+                    }
+                }
+            }
+        }))
 }
 
-fn tool_call_card(bubble: AgentMessageBubble, cx: &App) -> AnyElement {
+fn tool_call_card(bubble: AgentMessageBubble, _cx: &App) -> AnyElement {
     let (badge_label, badge_color) = match bubble.tool_state {
         ToolCallState::Running => ("Running", BadgeColor::Secondary),
         ToolCallState::Success => ("Success", BadgeColor::Success),
@@ -116,7 +178,7 @@ fn tool_call_card(bubble: AgentMessageBubble, cx: &App) -> AnyElement {
     };
     let disclosure_id = format!("{}-disclosure", bubble.id);
     let title = bubble.tool_name.unwrap_or_else(|| bubble.body.clone());
-    let has_raw = bubble.tool_input.is_some() || bubble.tool_output.is_some();
+    let has_content = !bubble.content.is_empty();
     let expanded = bubble.expanded;
 
     let tool_icon = Icon::new(IconName::ToolHammer)
@@ -128,7 +190,7 @@ fn tool_call_card(bubble: AgentMessageBubble, cx: &App) -> AnyElement {
     let disclosure =
         Disclosure::new(disclosure_id, expanded).on_toggle_expanded(bubble.on_toggle_expanded);
     let header = h_flex()
-        .id(bubble.id)
+        .id(bubble.id.clone())
         .w_full()
         .justify_between()
         .child(h_flex().gap_2().child(tool_icon).child(Label::new(title)))
@@ -136,23 +198,14 @@ fn tool_call_card(bubble: AgentMessageBubble, cx: &App) -> AnyElement {
             h_flex()
                 .gap_2()
                 .child(badge)
-                .when(has_raw, |this| this.child(disclosure)),
+                .when(has_content, |this| this.child(disclosure)),
         );
 
     Card::new()
         .variant(CardVariant::Bordered)
         .header(header)
-        .when(has_raw && expanded, |this| {
-            this.child(
-                v_flex()
-                    .gap_2()
-                    .when_some(bubble.tool_input, |this, input| {
-                        this.child(raw_block("Input", input, cx))
-                    })
-                    .when_some(bubble.tool_output, |this, output| {
-                        this.child(raw_block("Output", output, cx))
-                    }),
-            )
+        .when(has_content && expanded, |this| {
+            this.child(render_tool_call_content(&bubble.id, bubble.content))
         })
         .into_any_element()
 }
@@ -176,34 +229,46 @@ impl RenderOnce for AgentMessageBubble {
                     .into_any_element()
             }
             AgentMessageRole::Assistant => {
-                let md = AgentMarkdown::new(format!("{}-md", self.id), self.body);
+                let body: AnyElement = match self.markdown_body {
+                    Some(markdown) => {
+                        AgentMarkdown::new(format!("{}-md", self.id), markdown).into_any_element()
+                    }
+                    None => Label::new(self.body).into_any_element(),
+                };
                 div()
                     .id(self.id.clone())
                     .w_full()
-                    .child(md)
+                    .child(body)
                     .into_any_element()
             }
             AgentMessageRole::Thinking => {
-                let md = AgentMarkdown::new(format!("{}-md", self.id), self.body);
-                let header = h_flex()
-                    .gap_1()
-                    .child(
-                        Icon::new(IconName::ToolThink)
-                            .size(IconSize::XSmall)
-                            .color(Color::Muted),
-                    )
-                    .child(
-                        Label::new("Thinking")
-                            .size(LabelSize::Small)
-                            .color(Color::Muted),
-                    );
-                v_flex()
-                    .id(self.id.clone())
-                    .w_full()
-                    .gap_1()
-                    .child(header)
-                    .child(div().opacity(0.7).child(md))
-                    .into_any_element()
+                let expanded = self.expanded;
+                let toggle = self.on_toggle_expanded;
+                let content: AnyElement = match self.markdown_body {
+                    Some(markdown) => ThinkingBlock::new(self.id.clone(), markdown)
+                        .expanded(expanded)
+                        .when_some(toggle, |block, handler| {
+                            block.on_toggle_expanded(move |event, window, cx| {
+                                handler(event, window, cx)
+                            })
+                        })
+                        .into_any_element(),
+                    None => h_flex()
+                        .id(self.id.clone())
+                        .gap_1()
+                        .child(
+                            Icon::new(IconName::ToolThink)
+                                .size(IconSize::XSmall)
+                                .color(Color::Muted),
+                        )
+                        .child(
+                            Label::new(self.body)
+                                .size(LabelSize::Small)
+                                .color(Color::Muted),
+                        )
+                        .into_any_element(),
+                };
+                div().w_full().child(content).into_any_element()
             }
             AgentMessageRole::Status => h_flex()
                 .id(self.id)
@@ -225,20 +290,39 @@ impl Component for AgentMessageBubble {
         ComponentScope::Agent
     }
 
-    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
+    fn preview(_window: &mut Window, cx: &mut App) -> Option<AnyElement> {
+        let assistant_markdown = crate::agent_markdown_entity(
+            "Run `cargo test -p boltz-ui`.\n\n| Step | Result |\n|---|---|\n| build | ok |",
+            cx,
+        );
+        let thinking_markdown =
+            crate::agent_markdown_entity("Checking the test suite before making changes.", cx);
+
         let tool_call =
             AgentMessageBubble::new("m-tool-1", AgentMessageRole::ToolCall, "run_tests")
                 .tool_name("run_tests")
                 .tool_state(ToolCallState::Success)
-                .tool_input("cargo test -p boltz-ui")
-                .tool_output("test result: ok. 42 passed; 0 failed")
+                .content(vec![
+                    ToolCallContentDisplay::Terminal {
+                        command: Some("cargo test -p boltz-ui".into()),
+                        raw_output: "test result: ok. 42 passed; 0 failed".into(),
+                    },
+                    ToolCallContentDisplay::Diff {
+                        old_text: "fn old() {}".into(),
+                        new_text: "fn new() {}".into(),
+                        language: Some("rs".into()),
+                    },
+                ])
                 .expanded(true);
 
-        let assistant = AgentMessageBubble::new(
-            "m-a",
-            AgentMessageRole::Assistant,
-            "Run `cargo test -p boltz-ui`.",
-        );
+        let assistant = AgentMessageBubble::new("m-a", AgentMessageRole::Assistant, "")
+            .markdown_body(assistant_markdown);
+
+        let thinking =
+            AgentMessageBubble::new("m-thinking", AgentMessageRole::Thinking, "Checking...")
+                .markdown_body(thinking_markdown)
+                .expanded(true);
+
         let messages = v_flex()
             .gap_2()
             .child(AgentMessageBubble::new(
@@ -247,11 +331,7 @@ impl Component for AgentMessageBubble {
                 "How do I run tests?",
             ))
             .child(assistant)
-            .child(AgentMessageBubble::new(
-                "m-thinking",
-                AgentMessageRole::Thinking,
-                "Checking...",
-            ))
+            .child(thinking)
             .child(AgentMessageBubble::new(
                 "m-status",
                 AgentMessageRole::Status,

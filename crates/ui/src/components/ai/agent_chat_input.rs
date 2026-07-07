@@ -1,183 +1,270 @@
-use std::sync::Arc;
+use std::cell::Cell;
+use std::rc::Rc;
 
-use gpui::{ClickEvent, SharedString};
+use gpui::{
+    Bounds, Context, Entity, Focusable, KeyDownEvent, Pixels, Render, SharedString, canvas,
+};
 
-use crate::InputGroup;
+use crate::components::ai::completion_popover::{
+    CompletionItem, CompletionPopover, filter_completions,
+};
 use crate::prelude::*;
+use crate::{InputGroup, TextInput};
 
-/// A mention/command trigger at the start of a chat draft (`@` or `/`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TriggerChar {
-    Mention,
-    Command,
+/// Locates the `/`-command token currently being typed: the last
+/// whitespace-delimited word in `text`, if it starts with `/`. Returns the
+/// query substring after the `/` (empty for a bare `/`).
+fn detect_command_query(text: &str) -> Option<&str> {
+    let token_start = text
+        .rfind(char::is_whitespace)
+        .map(|ix| ix + 1)
+        .unwrap_or(0);
+    text[token_start..].strip_prefix('/')
 }
 
-impl TriggerChar {
-    fn from_char(c: char) -> Option<Self> {
-        match c {
-            '@' => Some(TriggerChar::Mention),
-            '/' => Some(TriggerChar::Command),
-            _ => None,
-        }
-    }
-
-    fn hint_label(self) -> &'static str {
-        match self {
-            TriggerChar::Mention => "Mentioning…",
-            TriggerChar::Command => "Running command…",
-        }
-    }
-    fn icon(self) -> IconName {
-        match self {
-            TriggerChar::Mention => IconName::AtSign,
-            TriggerChar::Command => IconName::Terminal,
-        }
-    }
+/// Replaces the in-progress `/`-command token (see [`detect_command_query`])
+/// with `insert_text`, followed by a trailing space.
+fn apply_completion(text: &str, insert_text: &str) -> String {
+    let token_start = text
+        .rfind(char::is_whitespace)
+        .map(|ix| ix + 1)
+        .unwrap_or(0);
+    let mut result = text[..token_start].to_string();
+    result.push_str(insert_text);
+    result.push(' ');
+    result
 }
 
-/// Detects a leading mention/command trigger in `draft`, returning the
-/// trigger plus the query substring up to the first whitespace. Pure
-/// detection only — resolving candidates is the caller's job.
-fn detect_trigger(draft: &str) -> Option<(TriggerChar, &str)> {
-    let mut chars = draft.chars();
-    let first = chars.next()?;
-    let trigger = TriggerChar::from_char(first)?;
-    let rest = &draft[first.len_utf8()..];
-    // A bare trigger followed by whitespace (e.g. "@ ") is no longer in-progress.
-    if rest.starts_with(char::is_whitespace) {
-        return None;
-    }
-    Some((trigger, rest.split_whitespace().next().unwrap_or("")))
-}
-
-/// A multi-line agent chat input on [`InputGroup`] chrome, with a hint row
-/// for `@`/`/` triggers and a send button. Pure builder — the caller owns
-/// the draft text and `sending` state and reacts via callbacks.
-#[derive(IntoElement, RegisterComponent)]
+/// A multiline agent chat input: a multiline `TextInput` inside `InputGroup`
+/// chrome with a send button, plus a `/`-command [`CompletionPopover`]
+/// triggered by typing `/` at the start of a word. Enter submits (clearing
+/// the draft); Shift/Ctrl/Cmd+Enter inserts a newline.
+///
+/// This input has no cursor-position tracking beyond "typed so far" (see
+/// `TextInput`), so `/`-completion is scoped to the trailing token of the
+/// whole buffer rather than the token under a cursor — a pragmatic v1 limit,
+/// not a full replication of a cursor-aware editor's completion scoping.
+///
+/// Stateful view — create with `cx.new(|cx| AgentChatInput::new(cx, ..))`.
 pub struct AgentChatInput {
-    id: ElementId,
-    draft: SharedString,
-    placeholder: SharedString,
+    input: Entity<TextInput>,
     sending: bool,
-    on_send: Option<Arc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
-    on_trigger: Option<Arc<dyn Fn(TriggerChar, SharedString, &mut Window, &mut App) + 'static>>,
+    commands: Vec<CompletionItem>,
+    completion_open: bool,
+    completion_selected_ix: usize,
+    /// Real screen bounds of the input row, captured via an invisible
+    /// `canvas()` measurement child every render and read back on the
+    /// *next* render to position the completion popover (see
+    /// `Combobox::trigger_bounds` for the full rationale).
+    input_bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
+    on_submit: Option<Rc<dyn Fn(SharedString, &mut Window, &mut App) + 'static>>,
 }
 
 impl AgentChatInput {
-    pub fn new(id: impl Into<ElementId>, draft: impl Into<SharedString>) -> Self {
+    pub fn new(cx: &mut Context<Self>, placeholder: impl Into<SharedString>) -> Self {
+        let input = cx.new(|cx| {
+            TextInput::new(cx)
+                .multiline(true)
+                .submit_on_enter(true)
+                .placeholder(placeholder)
+        });
+        cx.observe(&input, |_, _, cx| cx.notify()).detach();
         Self {
-            id: id.into(),
-            draft: draft.into(),
-            placeholder: "Ask anything…".into(),
+            input,
             sending: false,
-            on_send: None,
-            on_trigger: None,
+            commands: Vec::new(),
+            completion_open: false,
+            completion_selected_ix: 0,
+            input_bounds: Rc::new(Cell::new(None)),
+            on_submit: None,
         }
     }
 
-    pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
-        self.placeholder = placeholder.into();
-        self
-    }
-    /// Disables the send button and shows a busy state while `true`.
+    /// Disables the send button while `true`.
     pub fn sending(mut self, sending: bool) -> Self {
         self.sending = sending;
         self
     }
 
-    pub fn on_send(
+    /// Registers a callback fired with the drafted text when the user
+    /// submits (plain Enter, or clicking the send button). The draft is
+    /// cleared immediately after.
+    pub fn on_submit(
         mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+        handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,
     ) -> Self {
-        self.on_send = Some(Arc::new(handler));
+        self.on_submit = Some(Rc::new(handler));
         self
     }
 
-    /// Called during render when `draft` starts a mention/command trigger,
-    /// with the trigger char and the query substring typed so far.
-    pub fn on_trigger(
-        mut self,
-        handler: impl Fn(TriggerChar, SharedString, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_trigger = Some(Arc::new(handler));
-        self
+    /// Supplies the `/`-command list offered by the completion popover. The
+    /// caller sources these however it likes (e.g. from an agent runtime
+    /// event) — `boltz-ui` takes plain [`CompletionItem`]s only.
+    pub fn set_commands(&mut self, commands: Vec<CompletionItem>, cx: &mut Context<Self>) {
+        self.commands = commands;
+        cx.notify();
+    }
+
+    /// The current draft text.
+    pub fn text(&self, cx: &App) -> SharedString {
+        self.input.read(cx).text().to_string().into()
+    }
+
+    fn submit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let text = self.input.read(cx).text().to_string();
+        if text.trim().is_empty() {
+            return;
+        }
+        if let Some(on_submit) = self.on_submit.clone() {
+            on_submit(text.into(), window, cx);
+        }
+        self.input.update(cx, |input, cx| input.clear(cx));
+        self.completion_open = false;
+        cx.notify();
+    }
+
+    fn insert_completion(
+        &mut self,
+        insert_text: SharedString,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let text = self.input.read(cx).text().to_string();
+        let new_text = apply_completion(&text, &insert_text);
+        self.input
+            .update(cx, |input, cx| input.set_text(new_text, cx));
+        self.completion_open = false;
+        self.completion_selected_ix = 0;
+        let focus_handle = self.input.read(cx).focus_handle(cx);
+        window.focus(&focus_handle, cx);
+        cx.notify();
+    }
+
+    fn handle_key_down(
+        &mut self,
+        event: &KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let text = self.input.read(cx).text().to_string();
+        let query = detect_command_query(&text).map(str::to_string);
+        self.completion_open = query.is_some();
+
+        if let Some(query) = query {
+            let matched = filter_completions(&self.commands, &query);
+            match event.keystroke.key.as_str() {
+                "up" if !matched.is_empty() => {
+                    self.completion_selected_ix = if self.completion_selected_ix == 0 {
+                        matched.len() - 1
+                    } else {
+                        self.completion_selected_ix - 1
+                    };
+                }
+                "down" if !matched.is_empty() => {
+                    self.completion_selected_ix = (self.completion_selected_ix + 1) % matched.len();
+                }
+                "enter" => {
+                    if let Some(item) = matched.get(self.completion_selected_ix) {
+                        let insert_text = item.insert_text.clone();
+                        self.insert_completion(insert_text, window, cx);
+                    }
+                }
+                "escape" => self.completion_open = false,
+                _ => {}
+            }
+        } else {
+            let modifiers = &event.keystroke.modifiers;
+            let plain_enter = event.keystroke.key == "enter"
+                && !modifiers.shift
+                && !modifiers.control
+                && !modifiers.platform;
+            if plain_enter {
+                self.submit(window, cx);
+            }
+        }
+        cx.notify();
     }
 }
 
-impl RenderOnce for AgentChatInput {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let trigger = detect_trigger(&self.draft).map(|(t, q)| (t, q.to_string()));
+impl Render for AgentChatInput {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let text = self.input.read(cx).text().to_string();
+        let query = detect_command_query(&text).map(str::to_string);
+        let disabled = self.sending || text.trim().is_empty();
 
-        if let (Some((trigger, query)), Some(on_trigger)) = (&trigger, &self.on_trigger) {
-            on_trigger(*trigger, query.clone().into(), window, cx);
-        }
-
-        let is_empty = self.draft.is_empty();
-        let content = if is_empty {
-            Label::new(self.placeholder).color(Color::Placeholder)
-        } else {
-            Label::new(self.draft)
-        };
-
-        let disabled = self.sending || is_empty;
-        let send_button = IconButton::new(("send", 0usize), IconName::PlayFilled)
+        let send_button = IconButton::new("agent-chat-send", IconName::PlayFilled)
             .icon_size(IconSize::Small)
             .disabled(disabled)
-            .when_some(self.on_send, |this, handler| {
-                this.on_click(move |event, window, cx| handler(event, window, cx))
-            });
+            .on_click(cx.listener(|this, _event, window, cx| {
+                this.submit(window, cx);
+            }));
 
-        v_flex()
-            .id(self.id)
+        let input_bounds = self.input_bounds.clone();
+        let field = div()
+            .id("agent-chat-input-field")
+            .relative()
+            .w_full()
+            .min_h(px(64.))
+            .on_key_down(cx.listener(Self::handle_key_down))
+            .child(self.input.clone())
+            .child(
+                canvas(
+                    move |bounds, _window, _cx| input_bounds.set(Some(bounds)),
+                    |_bounds, _state, _window, _cx| {},
+                )
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full(),
+            );
+
+        let mut root = v_flex()
+            .id("agent-chat-input")
             .w_full()
             .gap_1()
-            .when_some(trigger, |this, (trigger, query)| {
-                let icon = Icon::new(trigger.icon())
-                    .size(IconSize::XSmall)
-                    .color(Color::Muted);
-                let label = Label::new(trigger.hint_label())
-                    .size(LabelSize::Small)
-                    .color(Color::Muted);
-                this.child(h_flex().gap_1().px_1().child(icon).child(label).when(
-                    !query.is_empty(),
-                    |this| {
-                        this.child(
-                            Label::new(query)
-                                .size(LabelSize::Small)
-                                .color(Color::Accent),
-                        )
-                    },
-                ))
-            })
-            .child(
-                InputGroup::new(div().w_full().min_h(px(64.)).child(content)).trailing(send_button),
+            .child(InputGroup::new(field).trailing(send_button));
+
+        if let Some(query) = query
+            && self.completion_open
+            && let Some(bounds) = self.input_bounds.get()
+        {
+            let entity = cx.entity();
+            let popover = CompletionPopover::new(
+                self.commands.clone(),
+                query,
+                self.completion_selected_ix,
+                bounds,
+                move |insert_text, window, cx| {
+                    entity.update(cx, |this, cx| {
+                        this.insert_completion(insert_text, window, cx)
+                    });
+                },
             )
+            .render(cx);
+            root = root.child(popover);
+        }
+
+        root
     }
 }
 
-impl Component for AgentChatInput {
-    fn scope() -> ComponentScope {
-        ComponentScope::Agent
-    }
-
-    fn preview(_window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
-        let sending = AgentChatInput::new("chat-sending", "Explain this function").sending(true);
-        Some(
-            v_flex()
-                .w_96()
-                .gap_4()
-                .child(single_example(
-                    "Empty",
-                    AgentChatInput::new("chat-empty", "").into_any_element(),
-                ))
-                .child(single_example(
-                    "Mention trigger",
-                    AgentChatInput::new("chat-mention", "@readm").into_any_element(),
-                ))
-                .child(single_example("Sending", sending.into_any_element()))
-                .into_any_element(),
-        )
-    }
+/// Standalone gallery preview for `AgentChatInput` (not registered in the
+/// `Component` catalog since it is a stateful `Entity`, matching
+/// `Combobox`/`Select`'s existing convention in this crate).
+pub fn agent_chat_input_preview(_window: &mut Window, cx: &mut App) -> AnyElement {
+    cx.new(|cx| {
+        let mut input = AgentChatInput::new(cx, "Ask anything…");
+        input.set_commands(
+            vec![
+                CompletionItem::new("help", "/help").description("Show available commands"),
+                CompletionItem::new("explain", "/explain").description("Explain the selection"),
+                CompletionItem::new("tests", "/tests").description("Generate tests"),
+            ],
+            cx,
+        );
+        input
+    })
+    .into_any_element()
 }
 
 #[cfg(test)]
@@ -185,33 +272,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn no_trigger_on_plain_text() {
-        assert_eq!(detect_trigger("hello world"), None);
+    fn no_query_on_plain_text() {
+        assert_eq!(detect_command_query("hello world"), None);
     }
+
     #[test]
-    fn mention_trigger_detected() {
-        assert_eq!(
-            detect_trigger("@alice"),
-            Some((TriggerChar::Mention, "alice"))
-        );
+    fn command_query_detected_at_start() {
+        assert_eq!(detect_command_query("/run"), Some("run"));
     }
+
     #[test]
-    fn command_trigger_detected() {
-        assert_eq!(
-            detect_trigger("/run tests"),
-            Some((TriggerChar::Command, "run"))
-        );
+    fn command_query_detected_after_whitespace() {
+        assert_eq!(detect_command_query("hello /run"), Some("run"));
     }
+
     #[test]
-    fn bare_trigger_has_empty_query() {
-        assert_eq!(detect_trigger("@"), Some((TriggerChar::Mention, "")));
+    fn bare_slash_has_empty_query() {
+        assert_eq!(detect_command_query("/"), Some(""));
     }
+
     #[test]
-    fn trigger_followed_by_space_is_not_in_progress() {
-        assert_eq!(detect_trigger("@ hello"), None);
+    fn command_followed_by_space_is_not_in_progress() {
+        assert_eq!(detect_command_query("/run tests"), None);
     }
+
     #[test]
-    fn non_trigger_leading_char_ignored() {
-        assert_eq!(detect_trigger("hello @alice"), None);
+    fn apply_completion_replaces_trailing_token() {
+        assert_eq!(apply_completion("hello /ru", "/run"), "hello /run ");
+    }
+
+    #[test]
+    fn apply_completion_on_bare_slash() {
+        assert_eq!(apply_completion("/", "/help"), "/help ");
     }
 }
