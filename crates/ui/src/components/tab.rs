@@ -1,8 +1,31 @@
-use gpui::{AnyElement, Div, IntoElement, Stateful, transparent_black};
+use std::cmp::Ordering;
+
+use gpui::{AnyElement, Div, IntoElement, Pixels, Stateful, px, transparent_black};
 use smallvec::SmallVec;
 
 use crate::TabBarStyle;
 use crate::prelude::*;
+
+const START_TAB_SLOT_SIZE: Pixels = px(12.);
+const END_TAB_SLOT_SIZE: Pixels = px(14.);
+
+/// The position of a [`Tab`] within a [`TabBar`](crate::TabBar)'s row, used
+/// to decide which edges get a border in the [`TabBarStyle::Underline`]
+/// style (ported from Zed's `tab.rs`).
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TabPosition {
+    First,
+    Middle(Ordering),
+    Last,
+}
+
+/// Which side of a [`Tab`]'s content the close button (or other end-slot
+/// element) sits on, relative to the fixed-size start/end slots.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TabCloseSide {
+    Start,
+    End,
+}
 
 /// A single tab within a [`TabBar`](crate::TabBar).
 ///
@@ -13,6 +36,8 @@ pub struct Tab {
     div: Stateful<Div>,
     selected: bool,
     style: TabBarStyle,
+    position: TabPosition,
+    close_side: TabCloseSide,
     start_slot: Option<AnyElement>,
     end_slot: Option<AnyElement>,
     children: SmallVec<[AnyElement; 2]>,
@@ -27,6 +52,8 @@ impl Tab {
                 .debug_selector(|| format!("TAB-{}", id)),
             selected: false,
             style: TabBarStyle::default(),
+            position: TabPosition::First,
+            close_side: TabCloseSide::End,
             start_slot: None,
             end_slot: None,
             children: SmallVec::new(),
@@ -36,6 +63,19 @@ impl Tab {
     /// Sets the visual style. Should match the parent [`TabBar`](crate::TabBar)'s style.
     pub fn style(mut self, style: TabBarStyle) -> Self {
         self.style = style;
+        self
+    }
+
+    /// Sets this tab's position within its row (see [`TabPosition`]).
+    pub fn position(mut self, position: TabPosition) -> Self {
+        self.position = position;
+        self
+    }
+
+    /// Sets which side the end slot (e.g. close button) sits on relative to
+    /// the fixed-size start/end slots (see [`TabCloseSide`]).
+    pub fn close_side(mut self, close_side: TabCloseSide) -> Self {
+        self.close_side = close_side;
         self
     }
 
@@ -82,60 +122,99 @@ impl ParentElement for Tab {
 impl RenderOnce for Tab {
     #[allow(refining_impl_trait)]
     fn render(self, _: &mut Window, cx: &mut App) -> Stateful<Div> {
-        // Title area grows (`flex_1`) so the end slot (e.g. a close "x") is
-        // pinned to the tab's right edge instead of sitting right after the
-        // text.
-        let content = h_flex()
-            .w_full()
-            .items_center()
-            .gap_2()
-            .children(self.start_slot)
-            .child(
-                h_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .items_center()
-                    .gap_2()
-                    .children(self.children),
-            )
-            .children(self.end_slot);
-
         match self.style {
             TabBarStyle::Underline => {
-                // VSCode-style tab: the active tab gets a top accent bar + a
-                // slightly elevated background + bright text; inactive tabs are
-                // flat/muted. Tabs sit flush, separated by a thin right divider.
-                // (Top accent, not a bottom border, per the requested look.)
-                let (text_color, bg, accent) = if self.selected {
+                let (text_color, tab_bg) = if self.selected {
                     (
-                        semantic::text(cx),
-                        semantic::elevated_surface(cx),
-                        palette::primary(500),
+                        cx.theme().colors().text,
+                        cx.theme().colors().tab_active_background,
                     )
                 } else {
                     (
-                        semantic::text_muted(cx),
-                        transparent_black(),
-                        transparent_black(),
+                        cx.theme().colors().text_muted,
+                        cx.theme().colors().tab_inactive_background,
                     )
                 };
-                let hover_color = semantic::text(cx);
+
+                // Start/end slots are fixed-size wrappers (12px/14px) so the
+                // close "x" (end slot) has a stable hit target regardless of
+                // title length; hoisted per `close_side` so it can sit on
+                // either edge of the content.
+                let start = h_flex()
+                    .size(START_TAB_SLOT_SIZE)
+                    .justify_center()
+                    .children(self.start_slot);
+                let end = h_flex()
+                    .size(END_TAB_SLOT_SIZE)
+                    .justify_center()
+                    .children(self.end_slot);
+                let (start_slot, end_slot) = match self.close_side {
+                    TabCloseSide::End => (start, end),
+                    TabCloseSide::Start => (end, start),
+                };
 
                 self.div
-                    .h_full()
-                    .min_w(px(140.))
-                    .flex()
-                    .items_center()
+                    .h(Tab::container_height(cx))
+                    .bg(tab_bg)
+                    .border_color(cx.theme().colors().border)
+                    .map(|this| match self.position {
+                        TabPosition::First => {
+                            if self.selected {
+                                this.pl_px().border_r_1().pb_px()
+                            } else {
+                                this.pl_px().pr_px().border_b_1()
+                            }
+                        }
+                        TabPosition::Last => {
+                            if self.selected {
+                                this.border_l_1().border_r_1().pb_px()
+                            } else {
+                                this.pl_px().border_b_1().border_r_1()
+                            }
+                        }
+                        TabPosition::Middle(Ordering::Equal) => {
+                            this.border_l_1().border_r_1().pb_px()
+                        }
+                        TabPosition::Middle(Ordering::Less) => {
+                            this.border_l_1().pr_px().border_b_1()
+                        }
+                        TabPosition::Middle(Ordering::Greater) => {
+                            this.border_r_1().pl_px().border_b_1()
+                        }
+                    })
                     .cursor_pointer()
-                    .px_3()
-                    .border_t_2()
-                    .border_color(accent)
-                    .bg(bg)
-                    .text_color(text_color)
-                    .hover(move |this| this.text_color(hover_color))
-                    .child(content)
+                    .child(
+                        h_flex()
+                            .group("")
+                            .relative()
+                            .h(Tab::content_height(cx))
+                            .px(DynamicSpacing::Base04.px(cx))
+                            .gap(DynamicSpacing::Base04.rems(cx))
+                            .text_color(text_color)
+                            .child(start_slot)
+                            .children(self.children)
+                            .child(end_slot),
+                    )
             }
             TabBarStyle::Pills => {
+                // Title area grows (`flex_1`) so the end slot (e.g. a close
+                // "x") is pinned to the tab's right edge instead of sitting
+                // right after the text.
+                let content = h_flex()
+                    .w_full()
+                    .items_center()
+                    .gap_2()
+                    .children(self.start_slot)
+                    .child(
+                        h_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .items_center()
+                            .gap_2()
+                            .children(self.children),
+                    )
+                    .children(self.end_slot);
+
                 let (text_color, bg) = if self.selected {
                     (semantic::text(cx), semantic::surface(cx))
                 } else {
@@ -182,14 +261,23 @@ impl Component for Tab {
                             single_example(
                                 "Default",
                                 Tab::new("underline_default")
+                                    .position(TabPosition::First)
                                     .child("Default Tab")
                                     .into_any_element(),
                             ),
                             single_example(
                                 "Selected",
                                 Tab::new("underline_selected")
+                                    .position(TabPosition::Middle(Ordering::Equal))
                                     .toggle_state(true)
                                     .child("Selected Tab")
+                                    .into_any_element(),
+                            ),
+                            single_example(
+                                "Last",
+                                Tab::new("underline_last")
+                                    .position(TabPosition::Last)
+                                    .child("Last Tab")
                                     .into_any_element(),
                             ),
                         ],
